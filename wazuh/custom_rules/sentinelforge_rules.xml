@@ -1,0 +1,152 @@
+<!--
+  SentinelForge Custom Wazuh Rules
+  Rule IDs: 100200 - 100299 (custom range)
+  Deployed to: /var/ossec/etc/rules/sentinelforge_rules.xml
+-->
+
+<group name="sentinelforge,">
+
+  <!-- ===== HONEYPOT RULES (Module 5: RPi) ===== -->
+
+  <!-- Any connection to the honeypot agent is suspicious -->
+  <rule id="100200" level="12">
+    <if_group>syslog</if_group>
+    <match>rpi-honeypot</match>
+    <description>Honeypot: Connection detected on honeypot agent</description>
+    <mitre>
+      <id>T1046</id>
+    </mitre>
+    <group>honeypot,sentinelforge,</group>
+  </rule>
+
+  <!-- Cowrie: SSH login attempt on honeypot -->
+  <rule id="100201" level="14">
+    <decoded_as>json</decoded_as>
+    <field name="eventid">cowrie.login.success|cowrie.login.failed</field>
+    <description>Honeypot: SSH login attempt detected (Cowrie)</description>
+    <mitre>
+      <id>T1110</id>
+    </mitre>
+    <group>honeypot,brute_force,sentinelforge,</group>
+  </rule>
+
+  <!-- Cowrie: Attacker executed commands after login -->
+  <rule id="100202" level="15">
+    <decoded_as>json</decoded_as>
+    <field name="eventid">cowrie.command.input</field>
+    <description>Honeypot: Attacker executed commands after honeypot login</description>
+    <mitre>
+      <id>T1059.004</id>
+    </mitre>
+    <group>honeypot,execution,sentinelforge,</group>
+  </rule>
+
+  <!-- Cowrie: File download attempt on honeypot -->
+  <rule id="100203" level="15">
+    <decoded_as>json</decoded_as>
+    <field name="eventid">cowrie.session.file_download</field>
+    <description>Honeypot: Attacker attempted file download on honeypot</description>
+    <mitre>
+      <id>T1105</id>
+    </mitre>
+    <group>honeypot,malware,sentinelforge,</group>
+  </rule>
+
+  <!-- ===== SSH BRUTE FORCE RULES ===== -->
+
+  <!-- Aggressive brute force: 10+ failures in 60s from same IP -->
+  <rule id="100210" level="13" frequency="10" timeframe="60">
+    <if_matched_sid>5710</if_matched_sid>
+    <same_source_ip />
+    <description>SSH: Aggressive brute force (10+ failures in 60s) from same IP</description>
+    <mitre>
+      <id>T1110.001</id>
+    </mitre>
+    <group>brute_force,authentication_failures,sentinelforge,</group>
+  </rule>
+
+  <!-- Distributed brute force: failures from 5+ different IPs in 120s -->
+  <rule id="100211" level="12" frequency="5" timeframe="120">
+    <if_matched_sid>5710</if_matched_sid>
+    <different_source_ip />
+    <description>SSH: Distributed brute force (5+ different source IPs in 120s)</description>
+    <mitre>
+      <id>T1110.003</id>
+    </mitre>
+    <group>brute_force,authentication_failures,sentinelforge,</group>
+  </rule>
+
+  <!-- ===== SUSPICIOUS COMMAND EXECUTION ===== -->
+
+  <!-- wget/curl to external host -->
+  <rule id="100220" level="10">
+    <if_group>syslog</if_group>
+    <match>wget |curl </match>
+    <regex>https?://\S+</regex>
+    <description>Suspicious: wget/curl downloading from external URL</description>
+    <mitre>
+      <id>T1105</id>
+    </mitre>
+    <group>execution,sentinelforge,</group>
+  </rule>
+
+  <!-- chmod +x on downloaded file -->
+  <rule id="100221" level="12">
+    <if_sid>100220</if_sid>
+    <match>chmod +x|chmod 755|chmod 777</match>
+    <description>Suspicious: Downloaded file made executable</description>
+    <mitre>
+      <id>T1059.004</id>
+    </mitre>
+    <group>execution,sentinelforge,</group>
+  </rule>
+
+  <!-- ===== PRIVILEGE ESCALATION ===== -->
+
+  <!-- Repeated sudo failures -->
+  <rule id="100230" level="11" frequency="3" timeframe="120">
+    <if_matched_sid>5401</if_matched_sid>
+    <same_source_ip />
+    <description>Privilege Escalation: Repeated sudo failures (3+ in 120s)</description>
+    <mitre>
+      <id>T1548.003</id>
+    </mitre>
+    <group>privilege_escalation,sentinelforge,</group>
+  </rule>
+
+  <!-- su attempt to root -->
+  <rule id="100231" level="10">
+    <if_group>syslog</if_group>
+    <match>su: FAILED SU</match>
+    <description>Privilege Escalation: Failed su attempt</description>
+    <mitre>
+      <id>T1548</id>
+    </mitre>
+    <group>privilege_escalation,sentinelforge,</group>
+  </rule>
+
+  <!-- ===== FILE INTEGRITY ===== -->
+
+  <!-- Critical config file changes -->
+  <rule id="100240" level="12">
+    <if_sid>550</if_sid>
+    <match>/etc/ssh/sshd_config|/etc/passwd|/etc/shadow|/etc/sudoers</match>
+    <description>File Integrity: Critical system config file modified</description>
+    <mitre>
+      <id>T1098</id>
+    </mitre>
+    <group>file_integrity,sentinelforge,</group>
+  </rule>
+
+  <!-- New executable in /tmp -->
+  <rule id="100241" level="10">
+    <if_sid>554</if_sid>
+    <match>/tmp/</match>
+    <description>File Integrity: New file created in /tmp directory</description>
+    <mitre>
+      <id>T1059</id>
+    </mitre>
+    <group>file_integrity,sentinelforge,</group>
+  </rule>
+
+</group>

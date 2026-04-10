@@ -1,0 +1,169 @@
+version: '3.8'
+
+services:
+  # ─── Wazuh Indexer (OpenSearch) ─────────────────────────────────
+  wazuh-indexer:
+    image: wazuh/wazuh-indexer:4.14.4
+    container_name: sf-wazuh-indexer
+    hostname: wazuh-indexer
+    restart: unless-stopped
+    ports:
+      - "9200:9200"
+    environment:
+      OPENSEARCH_JAVA_OPTS: "-Xms1g -Xmx1g"
+      bootstrap.memory_lock: "true"
+      discovery.type: single-node
+      plugins.security.ssl.http.enabled: "false"
+      plugins.security.disabled: "true"
+      compatibility.override_main_response_version: "true"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - wazuh-indexer-data:/var/lib/wazuh-indexer
+    networks:
+      - sentinelforge
+
+  # ─── Wazuh Manager ─────────────────────────────────────────────
+  wazuh-manager:
+    image: wazuh/wazuh-manager:4.14.4
+    container_name: sf-wazuh-manager
+    hostname: wazuh-manager
+    restart: unless-stopped
+    ports:
+      - "1514:1514"       # Agent communication
+      - "1515:1515"       # Agent enrollment
+      - "514:514/udp"     # Syslog
+      - "55000:55000"     # Wazuh REST API
+    environment:
+      INDEXER_URL: http://wazuh-indexer:9200
+      INDEXER_USERNAME: ""
+      INDEXER_PASSWORD: ""
+      FILEBEAT_SSL_VERIFICATION_MODE: none
+      SSL_CERTIFICATE_AUTHORITIES: ""
+      SSL_CERTIFICATE: ""
+      SSL_KEY: ""
+      API_USERNAME: ${WAZUH_API_USER:-wazuh-wui}
+      API_PASSWORD: ${WAZUH_API_PASSWORD:-MyS3cr3tP4ssw0rd!}
+    volumes:
+      - wazuh-api-config:/var/ossec/api/configuration
+      - wazuh-etc:/var/ossec/etc
+      - wazuh-logs:/var/ossec/logs
+      - wazuh-queue:/var/ossec/queue
+      - wazuh-var-multigroups:/var/ossec/var/multigroups
+      - wazuh-integrations:/var/ossec/integrations
+      - wazuh-active-response:/var/ossec/active-response/bin
+      - wazuh-agentless:/var/ossec/agentless
+      - wazuh-wodles:/var/ossec/wodles
+      - filebeat-etc:/etc/filebeat
+      - filebeat-var:/var/lib/filebeat
+      - ./wazuh/custom_rules/sentinelforge_rules.xml:/var/ossec/etc/rules/sentinelforge_rules.xml:ro
+    depends_on:
+      - wazuh-indexer
+    networks:
+      - sentinelforge
+
+  # ─── Wazuh Dashboard ───────────────────────────────────────────
+  wazuh-dashboard:
+    image: wazuh/wazuh-dashboard:4.14.4
+    container_name: sf-wazuh-dashboard
+    hostname: wazuh-dashboard
+    restart: unless-stopped
+    ports:
+      - "5601:5601"
+    environment:
+      INDEXER_USERNAME: admin
+      INDEXER_PASSWORD: SecretPassword
+      WAZUH_API_URL: https://wazuh-manager
+      DASHBOARD_USERNAME: kibanaserver
+      DASHBOARD_PASSWORD: kibanaserver
+      API_USERNAME: ${WAZUH_API_USER:-wazuh-wui}
+      API_PASSWORD: ${WAZUH_API_PASSWORD:-MyS3cr3tP4ssw0rd!}
+      SERVER_SSL_ENABLED: "false"
+      OPENSEARCH_HOSTS: http://wazuh-indexer:9200
+    depends_on:
+      - wazuh-indexer
+      - wazuh-manager
+    networks:
+      - sentinelforge
+
+  # ─── PostgreSQL ─────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: sf-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-sentinelforge}
+      POSTGRES_USER: ${POSTGRES_USER:-sf_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - sentinelforge
+
+  # ─── Redis ──────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: sf-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - sentinelforge
+
+  # ─── Backend (FastAPI) ──────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: sf-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-sf_admin}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-sentinelforge}
+      REDIS_URL: redis://redis:6379/0
+      WAZUH_INDEXER_URL: http://wazuh-indexer:9200
+      WAZUH_MANAGER_URL: https://wazuh-manager:55000
+      WAZUH_API_USER: ${WAZUH_API_USER:-wazuh-wui}
+      WAZUH_API_PASSWORD: ${WAZUH_API_PASSWORD:-MyS3cr3tP4ssw0rd!}
+      SECRET_KEY: ${SECRET_KEY:-changeme-in-production}
+      DEBUG: ${DEBUG:-true}
+      POLL_INTERVAL: ${POLL_INTERVAL:-30}
+    depends_on:
+      - postgres
+      - redis
+      - wazuh-manager
+      - wazuh-indexer
+    volumes:
+      - ./backend:/app
+    networks:
+      - sentinelforge
+
+volumes:
+  wazuh-indexer-data:
+  wazuh-api-config:
+  wazuh-etc:
+  wazuh-logs:
+  wazuh-queue:
+  wazuh-var-multigroups:
+  wazuh-integrations:
+  wazuh-active-response:
+  wazuh-agentless:
+  wazuh-wodles:
+  filebeat-etc:
+  filebeat-var:
+  postgres-data:
+  redis-data:
+
+networks:
+  sentinelforge:
+    driver: bridge

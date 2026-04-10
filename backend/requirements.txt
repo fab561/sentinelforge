@@ -1,0 +1,22 @@
+# FastAPI
+fastapi[standard]==0.115.*
+uvicorn[standard]==0.34.*
+pydantic-settings==2.*
+
+# Database
+sqlalchemy[asyncio]==2.*
+asyncpg==0.30.*
+alembic==1.14.*
+
+# Redis
+redis[hiredis]==5.*
+
+# HTTP client (Wazuh API calls)
+httpx==0.28.*
+
+# Auth
+passlib[bcrypt]==1.7.*
+python-jose[cryptography]==3.3.*
+
+# Utilities
+python-dateutil==2.*
