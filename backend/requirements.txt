@@ -23,3 +23,6 @@ python-dateutil==2.*
 
 # Module 2: Enrichment worker (uses httpx already listed above)
 # No additional deps required — httpx + redis already present
+
+# Module 3: Playbook engine
+pyyaml==6.*
