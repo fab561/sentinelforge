@@ -148,6 +148,41 @@ services:
     networks:
       - sentinelforge
 
+  # ─── Cowrie SSH Honeypot (Module 5 — Ayush) ────────────────────
+  cowrie:
+    image: cowrie/cowrie:latest   # multi-arch: amd64 + arm64 (RPi)
+    container_name: sf-cowrie
+    restart: unless-stopped
+    ports:
+      - "2222:2222"   # SSH honeypot port (attackers connect here)
+      #- "22:2222"    # Uncomment to expose on default SSH port (requires host SSH moved to another port)
+    volumes:
+      - ./m5/cowrie/cowrie.cfg:/home/cowrie/cowrie/etc/cowrie.cfg:ro
+      - ./m5/cowrie/userdb.txt:/home/cowrie/cowrie/etc/userdb.txt:ro
+      - cowrie-logs:/home/cowrie/cowrie/var/log/cowrie
+      - cowrie-data:/home/cowrie/cowrie/var/lib/cowrie
+    networks:
+      - sentinelforge
+
+  # ─── Wazuh Agent — reads Cowrie logs, ships to manager ─────────
+  wazuh-agent:
+    build:
+      context: ./m5/wazuh-agent
+      dockerfile: Dockerfile
+    container_name: sf-wazuh-agent
+    restart: unless-stopped
+    environment:
+      WAZUH_MANAGER: wazuh-manager
+      WAZUH_MANAGER_PORT: "1514"
+    volumes:
+      # Shared log volume — agent reads what Cowrie writes
+      - cowrie-logs:/var/log/cowrie:ro
+    depends_on:
+      - cowrie
+      - wazuh-manager
+    networks:
+      - sentinelforge
+
   # ─── Enrichment Worker (Module 2 — Kunal) ──────────────────────
   enrichment-worker:
     build:
@@ -225,6 +260,8 @@ volumes:
   filebeat-var:
   postgres-data:
   redis-data:
+  cowrie-logs:    # shared between cowrie + wazuh-agent
+  cowrie-data:
 
 networks:
   sentinelforge:
