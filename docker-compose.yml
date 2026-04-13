@@ -148,6 +148,36 @@ services:
     networks:
       - sentinelforge
 
+  # ─── Enrichment Worker (Module 2 — Kunal) ──────────────────────
+  enrichment-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: sf-enrichment-worker
+    restart: unless-stopped
+    command: python -m app.enrichment.worker
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-sf_admin}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-sentinelforge}
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: ${SECRET_KEY:-changeme-in-production}
+      DEBUG: ${DEBUG:-false}
+      # Threat intel API keys (set in .env)
+      VIRUSTOTAL_API_KEY: ${VIRUSTOTAL_API_KEY:-}
+      ABUSEIPDB_API_KEY: ${ABUSEIPDB_API_KEY:-}
+      GREYNOISE_API_KEY: ${GREYNOISE_API_KEY:-}
+      OTX_API_KEY: ${OTX_API_KEY:-}
+      # Enrichment tuning
+      ENRICHMENT_CACHE_TTL: ${ENRICHMENT_CACHE_TTL:-3600}
+      ENRICHMENT_CONCURRENT_LIMIT: ${ENRICHMENT_CONCURRENT_LIMIT:-5}
+    depends_on:
+      - postgres
+      - redis
+      - backend
+    volumes:
+      - ./backend:/app
+    networks:
+      - sentinelforge
+
 volumes:
   wazuh-indexer-data:
   wazuh-api-config:

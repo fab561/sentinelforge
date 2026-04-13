@@ -22,6 +22,16 @@ class Settings(BaseSettings):
     # Alert ID prefix
     ALERT_ID_PREFIX: str = "sf"
 
+    # ── Module 2: Threat Intel API Keys ─────────────────────────────
+    VIRUSTOTAL_API_KEY: str = ""   # https://www.virustotal.com/gui/my-apikey
+    ABUSEIPDB_API_KEY: str = ""    # https://www.abuseipdb.com/account/api
+    GREYNOISE_API_KEY: str = ""    # https://viz.greynoise.io/account/api-key
+    OTX_API_KEY: str = ""          # https://otx.alienvault.com/api
+
+    # Enrichment worker settings
+    ENRICHMENT_CACHE_TTL: int = 3600   # seconds to cache provider responses
+    ENRICHMENT_CONCURRENT_LIMIT: int = 5  # max concurrent provider API calls
+
     model_config = {"env_file": ".env", "extra": "ignore"}
 
 
