@@ -1,0 +1,30 @@
+name: escalate-critical
+description: >
+  Auto-create an incident case for any critical-severity alert,
+  regardless of enrichment verdict (even if enrichment is pending).
+enabled: true
+priority: 2
+match: all
+
+conditions:
+  - field: severity
+    operator: eq
+    value: critical
+
+actions:
+  - type: notify
+    params:
+      message: "CRITICAL alert {alert.alert_id} — {alert.title}"
+      level: critical
+
+  - type: create_case
+    params:
+      title: "[CRITICAL] {alert.title}"
+      description: >
+        Auto-escalated: critical severity alert detected.
+        Review immediately.
+      severity: critical
+
+  - type: update_status
+    params:
+      status: escalated

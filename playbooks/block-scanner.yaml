@@ -1,0 +1,35 @@
+name: block-scanner
+description: >
+  Block known internet scanners and brute-force sources at the network
+  edge via Cloudflare. Targets alerts tagged as scanners by GreyNoise
+  or matching brute_force/web_attack categories with high/critical severity.
+enabled: true
+priority: 3
+match: any
+
+conditions:
+  - field: category
+    operator: in
+    value: [brute_force, web_attack, intrusion]
+  - field: enrichment.summary.tags
+    operator: contains
+    value: "gn:malicious"
+  - field: enrichment.summary.tags
+    operator: contains
+    value: "gn:noise"
+
+actions:
+  - type: notify
+    params:
+      message: "Scanner/brute-force detected: {alert.alert_id} category={alert.category}"
+      level: warning
+
+  - type: block_ip
+    target: source_ip
+    params:
+      note: "SentinelForge: scanner/brute-force block | {alert.alert_id}"
+
+  - type: tag_alert
+    params:
+      tags:
+        - "playbook:scanner-blocked"

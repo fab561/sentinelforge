@@ -32,6 +32,11 @@ class Settings(BaseSettings):
     ENRICHMENT_CACHE_TTL: int = 3600   # seconds to cache provider responses
     ENRICHMENT_CONCURRENT_LIMIT: int = 5  # max concurrent provider API calls
 
+    # ── Module 3: Playbook Engine ────────────────────────────────────
+    CLOUDFLARE_API_TOKEN: str = ""     # Zone:Firewall Rules:Edit permission
+    CLOUDFLARE_ZONE_ID: str = ""       # Target zone ID for IP blocks
+    PLAYBOOK_DIR: str = "/app/playbooks"  # Mounted playbooks directory
+
     model_config = {"env_file": ".env", "extra": "ignore"}
 
 

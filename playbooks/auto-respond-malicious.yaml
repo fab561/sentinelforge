@@ -1,0 +1,44 @@
+name: auto-respond-malicious
+description: >
+  Block source IP via Cloudflare and trigger Wazuh active-response
+  for confirmed malicious alerts with threat score >= 70.
+enabled: true
+priority: 1
+match: all
+
+conditions:
+  - field: verdict
+    operator: eq
+    value: malicious
+  - field: threat_score
+    operator: gte
+    value: 70
+
+actions:
+  - type: notify
+    params:
+      message: "MALICIOUS alert {alert.alert_id} — score={alert.threat_score} category={alert.category}"
+      level: critical
+
+  - type: block_ip
+    target: source_ip
+    params:
+      note: "SentinelForge auto-block | {alert.alert_id} | score={alert.threat_score}"
+
+  - type: wazuh_active_response
+    params:
+      command: firewall-drop
+      arguments: ["{observables.source_ip}"]
+      agent_field: hostname
+
+  - type: create_case
+    params:
+      title: "[AUTO] Malicious activity: {alert.title}"
+      description: >
+        Automatically escalated by SentinelForge playbook 'auto-respond-malicious'.
+        Threat score exceeded threshold. IP blocking and active-response initiated.
+      severity: "{alert.severity}"
+
+  - type: update_status
+    params:
+      status: escalated

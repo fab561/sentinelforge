@@ -1,0 +1,37 @@
+name: create-case-suspicious
+description: >
+  Create an incident case for suspicious alerts (score 40-69) for
+  manual analyst review. No automated blocking — human-in-the-loop.
+enabled: true
+priority: 10
+match: all
+
+conditions:
+  - field: verdict
+    operator: eq
+    value: suspicious
+  - field: threat_score
+    operator: gte
+    value: 40
+  - field: threat_score
+    operator: lt
+    value: 70
+
+actions:
+  - type: notify
+    params:
+      message: "SUSPICIOUS alert {alert.alert_id} requires review — score={alert.threat_score}"
+      level: warning
+
+  - type: create_case
+    params:
+      title: "[REVIEW] Suspicious activity: {alert.title}"
+      description: >
+        Suspicious-confidence alert auto-escalated for analyst review.
+        Threat score is in the 40–69 range — manual investigation recommended
+        before taking blocking action.
+      severity: "{alert.severity}"
+
+  - type: update_status
+    params:
+      status: escalated

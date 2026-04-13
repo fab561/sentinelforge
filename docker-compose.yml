@@ -178,6 +178,38 @@ services:
     networks:
       - sentinelforge
 
+  # ─── Playbook Worker (Module 3 — Tathagata) ────────────────────
+  playbook-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: sf-playbook-worker
+    restart: unless-stopped
+    command: python -m app.playbook.worker
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-sf_admin}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-sentinelforge}
+      REDIS_URL: redis://redis:6379/0
+      WAZUH_MANAGER_URL: https://wazuh-manager:55000
+      WAZUH_API_USER: ${WAZUH_API_USER:-wazuh-wui}
+      WAZUH_API_PASSWORD: ${WAZUH_API_PASSWORD:-MyS3cr3tP4ssw0rd!}
+      SECRET_KEY: ${SECRET_KEY:-changeme-in-production}
+      DEBUG: ${DEBUG:-false}
+      # Cloudflare (for IP blocking)
+      CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:-}
+      CLOUDFLARE_ZONE_ID: ${CLOUDFLARE_ZONE_ID:-}
+      # Playbook dir (mounted below)
+      PLAYBOOK_DIR: /app/playbooks
+    depends_on:
+      - postgres
+      - redis
+      - backend
+      - wazuh-manager
+    volumes:
+      - ./backend:/app
+      - ./playbooks:/app/playbooks:ro
+    networks:
+      - sentinelforge
+
 volumes:
   wazuh-indexer-data:
   wazuh-api-config:
