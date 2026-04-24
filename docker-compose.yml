@@ -25,6 +25,7 @@ services:
         hard: 65536
     volumes:
       - wazuh-indexer-data:/var/lib/wazuh-indexer
+      - ./wazuh/indexer/opensearch.yml:/usr/share/wazuh-indexer/config/opensearch.yml:ro
     networks:
       - sentinelforge
 
@@ -76,15 +77,16 @@ services:
     ports:
       - "5601:5601"
     environment:
-      INDEXER_USERNAME: admin
-      INDEXER_PASSWORD: SecretPassword
       WAZUH_API_URL: https://wazuh-manager
-      DASHBOARD_USERNAME: kibanaserver
-      DASHBOARD_PASSWORD: kibanaserver
       API_USERNAME: ${WAZUH_API_USER:-wazuh-wui}
       API_PASSWORD: ${WAZUH_API_PASSWORD:-MyS3cr3tP4ssw0rd!}
       SERVER_SSL_ENABLED: "false"
-      OPENSEARCH_HOSTS: http://wazuh-indexer:9200
+      OPENSEARCH_HOSTS: '["http://wazuh-indexer:9200"]'
+    # Security plugin depends on indexer's security API which is disabled.
+    # Strip the dashboard-side plugin at startup so no login is required.
+    entrypoint: ["/bin/bash", "-c", "rm -rf /usr/share/wazuh-dashboard/plugins/securityDashboards && exec /entrypoint.sh"]
+    volumes:
+      - ./wazuh/dashboard/opensearch_dashboards.yml:/usr/share/wazuh-dashboard/config/opensearch_dashboards.yml:ro
     depends_on:
       - wazuh-indexer
       - wazuh-manager
@@ -175,8 +177,9 @@ services:
       WAZUH_MANAGER: wazuh-manager
       WAZUH_MANAGER_PORT: "1514"
     volumes:
-      # Shared log volume — agent reads what Cowrie writes
-      - cowrie-logs:/var/log/cowrie:ro
+      # Shared log volume — agent reads what Cowrie writes.
+      # NOT :ro — Wazuh agent entrypoint touches a marker file here.
+      - cowrie-logs:/var/log/cowrie
     depends_on:
       - cowrie
       - wazuh-manager

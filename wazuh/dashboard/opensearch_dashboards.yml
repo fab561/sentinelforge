@@ -1,0 +1,20 @@
+# SentinelForge — Wazuh Dashboard config
+# Matches the indexer running without TLS/security. College lab only.
+
+server.host: "0.0.0.0"
+server.port: 5601
+server.ssl.enabled: false
+
+# Point at the plain-HTTP indexer
+opensearch.hosts: ["http://wazuh-indexer:9200"]
+opensearch.ssl.verificationMode: none
+
+# NOTE: securityDashboards plugin is removed at container start (compose
+# entrypoint) because the indexer has the security plugin disabled. These
+# keys are harmless without the plugin but documented for clarity.
+opensearch.username: "kibanaserver"
+opensearch.password: "kibanaserver"
+
+# Wazuh app → manager API (still over HTTPS with self-signed cert)
+# Wazuh 4.14+ renamed the main app from /app/wazuh to /app/wz-home.
+uiSettings.overrides.defaultRoute: /app/wz-home

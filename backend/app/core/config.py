@@ -10,6 +10,8 @@ class Settings(BaseSettings):
 
     # Wazuh
     WAZUH_INDEXER_URL: str = "http://wazuh-indexer:9200"
+    WAZUH_INDEXER_USER: str = ""
+    WAZUH_INDEXER_PASSWORD: str = ""
     WAZUH_MANAGER_URL: str = "https://wazuh-manager:55000"
     WAZUH_API_USER: str = "wazuh-wui"
     WAZUH_API_PASSWORD: str = "MyS3cr3tP4ssw0rd!"

@@ -1,0 +1,17 @@
+# SentinelForge — Wazuh Indexer (OpenSearch) config
+# Security plugin disabled for lab/college environment. DO NOT use in production
+# without enabling TLS + RBAC (see Wazuh docs: securing the indexer).
+
+cluster.name: "wazuh-cluster"
+node.name: "wazuh-indexer"
+network.host: 0.0.0.0
+discovery.type: single-node
+bootstrap.memory_lock: true
+
+# Disable transport + HTTP SSL so the backend can hit http://wazuh-indexer:9200
+plugins.security.disabled: true
+plugins.security.ssl.http.enabled: false
+plugins.security.ssl.transport.enabled: false
+
+# Legacy API compat — Wazuh Dashboard expects OS 1.x main-response shape
+compatibility.override_main_response_version: true

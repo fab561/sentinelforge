@@ -10,10 +10,17 @@ class WazuhIndexerClient:
 
     def __init__(self) -> None:
         self.base_url = settings.WAZUH_INDEXER_URL
+        auth: httpx.BasicAuth | None = None
+        if settings.WAZUH_INDEXER_USER:
+            auth = httpx.BasicAuth(
+                settings.WAZUH_INDEXER_USER,
+                settings.WAZUH_INDEXER_PASSWORD,
+            )
         self.client = httpx.AsyncClient(
             base_url=self.base_url,
             verify=False,
             timeout=30.0,
+            auth=auth,
         )
 
     async def search_alerts(

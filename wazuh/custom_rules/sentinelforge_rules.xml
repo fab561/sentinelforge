@@ -65,11 +65,13 @@
     <group>brute_force,authentication_failures,sentinelforge,</group>
   </rule>
 
-  <!-- Distributed brute force: failures from 5+ different IPs in 120s -->
+  <!-- Distributed brute force: 5+ SSH failures in 120s (no same_source_ip
+       constraint → fires when different IPs contribute). Wazuh doesn't
+       support a <different_source_ip/> element; the absence of a grouping
+       constraint yields the same effect. -->
   <rule id="100211" level="12" frequency="5" timeframe="120">
     <if_matched_sid>5710</if_matched_sid>
-    <different_source_ip />
-    <description>SSH: Distributed brute force (5+ different source IPs in 120s)</description>
+    <description>SSH: Distributed brute force (5+ failures in 120s, multiple sources)</description>
     <mitre>
       <id>T1110.003</id>
     </mitre>
