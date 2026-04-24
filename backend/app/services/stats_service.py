@@ -8,6 +8,9 @@ from app.models.alert import Alert
 from app.models.case import Case
 from app.schemas.stats import (
     CategoryCount,
+    MitreStatsResponse,
+    MitreTacticGroup,
+    MitreTechniqueCount,
     SeverityCount,
     StatsResponse,
     TrendPoint,
@@ -94,4 +97,78 @@ async def get_dashboard_stats(db: AsyncSession) -> StatsResponse:
         active_cases=active_cases,
         total_agents=total_agents,
         alerts_trend_24h=alerts_trend,
+    )
+
+
+async def get_mitre_stats(db: AsyncSession) -> MitreStatsResponse:
+    """Aggregate alert MITRE ATT&CK coverage for heatmap.
+
+    Alert.mitre is JSONB with shape {tactic, technique, subtechnique}.
+    Groups by tactic, then by technique within each tactic.
+    """
+    # Mapped vs unmapped
+    total_mapped = (
+        await db.execute(
+            select(func.count(Alert.id)).where(
+                Alert.mitre.isnot(None),
+                Alert.mitre["technique"].isnot(None),
+            )
+        )
+    ).scalar_one()
+    total_unmapped = (
+        await db.execute(
+            select(func.count(Alert.id)).where(
+                (Alert.mitre.is_(None)) | (Alert.mitre["technique"].is_(None))
+            )
+        )
+    ).scalar_one()
+
+    # Group by tactic + technique + subtechnique
+    rows = (
+        await db.execute(
+            select(
+                Alert.mitre["tactic"].astext.label("tactic"),
+                Alert.mitre["technique"].astext.label("technique"),
+                Alert.mitre["subtechnique"].astext.label("subtechnique"),
+                func.count(Alert.id).label("count"),
+            )
+            .where(
+                Alert.mitre.isnot(None),
+                Alert.mitre["technique"].isnot(None),
+            )
+            .group_by("tactic", "technique", "subtechnique")
+            .order_by(func.count(Alert.id).desc())
+        )
+    ).all()
+
+    tactic_map: dict[str, list[MitreTechniqueCount]] = {}
+    tactic_totals: dict[str, int] = {}
+    for tactic, technique, subtechnique, count in rows:
+        bucket = tactic_map.setdefault(tactic or "Unknown", [])
+        bucket.append(
+            MitreTechniqueCount(
+                technique=technique,
+                subtechnique=subtechnique,
+                count=count,
+            )
+        )
+        tactic_totals[tactic or "Unknown"] = (
+            tactic_totals.get(tactic or "Unknown", 0) + count
+        )
+
+    tactics = [
+        MitreTacticGroup(
+            tactic=t,
+            total=tactic_totals[t],
+            techniques=techs,
+        )
+        for t, techs in sorted(
+            tactic_map.items(), key=lambda kv: tactic_totals[kv[0]], reverse=True
+        )
+    ]
+
+    return MitreStatsResponse(
+        total_mapped=total_mapped,
+        total_unmapped=total_unmapped,
+        tactics=tactics,
     )

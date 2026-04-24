@@ -33,3 +33,21 @@ class StatsResponse(BaseModel):
     active_cases: int
     total_agents: int
     alerts_trend_24h: list[TrendPoint]
+
+
+class MitreTechniqueCount(BaseModel):
+    technique: str           # e.g. "T1110"
+    subtechnique: str | None  # e.g. "T1110.003"
+    count: int
+
+
+class MitreTacticGroup(BaseModel):
+    tactic: str                       # e.g. "Credential Access"
+    total: int                        # sum of technique counts
+    techniques: list[MitreTechniqueCount]
+
+
+class MitreStatsResponse(BaseModel):
+    total_mapped: int                 # alerts with any mitre data
+    total_unmapped: int               # alerts missing mitre
+    tactics: list[MitreTacticGroup]

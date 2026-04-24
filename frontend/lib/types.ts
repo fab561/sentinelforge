@@ -97,6 +97,24 @@ export interface StatsResponse {
   alerts_trend_24h: { hour: string; count: number }[];
 }
 
+export interface MitreTechniqueCount {
+  technique: string;
+  subtechnique: string | null;
+  count: number;
+}
+
+export interface MitreTacticGroup {
+  tactic: string;
+  total: number;
+  techniques: MitreTechniqueCount[];
+}
+
+export interface MitreStatsResponse {
+  total_mapped: number;
+  total_unmapped: number;
+  tactics: MitreTacticGroup[];
+}
+
 export interface WazuhAgent {
   id: string;
   name: string;

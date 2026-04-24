@@ -8,6 +8,7 @@ import {
   FolderOpen,
   Shield,
   Cpu,
+  Crosshair,
   ShieldAlert,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -17,6 +18,7 @@ const nav = [
   { href: "/alerts",    label: "Alerts",    icon: AlertTriangle },
   { href: "/cases",     label: "Cases",     icon: FolderOpen },
   { href: "/rules",     label: "Rules",     icon: Shield },
+  { href: "/mitre",     label: "MITRE",     icon: Crosshair },
   { href: "/agents",    label: "Agents",    icon: Cpu },
 ];
 

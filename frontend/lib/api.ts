@@ -3,6 +3,7 @@ import type {
   Alert,
   CaseListResponse,
   Case,
+  MitreStatsResponse,
   RuleListResponse,
   Rule,
   StatsResponse,
@@ -76,6 +77,7 @@ export const api = {
   },
   stats: {
     get: () => get<StatsResponse>("/api/stats"),
+    mitre: () => get<MitreStatsResponse>("/api/stats/mitre"),
   },
   wazuh: {
     agents: () =>
