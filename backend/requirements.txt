@@ -27,3 +27,7 @@ python-dateutil==2.*
 
 # Module 3: Playbook engine
 pyyaml==6.*
+
+# Evidence storage (MinIO S3 client). sync API wrapped in asyncio.to_thread —
+# MinIO doesn't ship an async client and a sync wrap is lighter than aioboto3.
+minio==7.*

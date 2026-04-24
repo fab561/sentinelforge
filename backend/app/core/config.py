@@ -39,6 +39,14 @@ class Settings(BaseSettings):
     CLOUDFLARE_ZONE_ID: str = ""       # Target zone ID for IP blocks
     PLAYBOOK_DIR: str = "/app/playbooks"  # Mounted playbooks directory
 
+    # ── Evidence storage (MinIO / S3-compatible) ────────────────────
+    MINIO_ENDPOINT: str = "minio:9000"        # <host>:<port> (no scheme)
+    MINIO_ACCESS_KEY: str = "sf_admin"
+    MINIO_SECRET_KEY: str = "changeme-minio-pw"
+    MINIO_SECURE: bool = False                # True for HTTPS
+    MINIO_BUCKET: str = "sentinelforge-evidence"
+    EVIDENCE_MAX_BYTES: int = 100 * 1024 * 1024   # 100 MB hard cap per file
+
     model_config = {"env_file": ".env", "extra": "ignore"}
 
 

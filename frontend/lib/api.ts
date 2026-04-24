@@ -3,6 +3,7 @@ import type {
   Alert,
   CaseListResponse,
   Case,
+  EvidenceListResponse,
   MitreStatsResponse,
   MttrStatsResponse,
   RuleListResponse,
@@ -63,6 +64,35 @@ export const api = {
     create: (body: { title: string; description?: string; severity?: string }) =>
       post<Case>("/api/cases", body),
     update: (id: string, body: Partial<Case>) => patch<Case>(`/api/cases/${id}`, body),
+    evidence: (id: string) =>
+      get<EvidenceListResponse>(`/api/cases/${id}/evidence`),
+  },
+  evidence: {
+    // Stream-through; backend proxies MinIO so the browser never needs to
+    // hit the internal endpoint directly.
+    downloadUrl: (id: string) => {
+      const base =
+        (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/$/, "");
+      return `${base}/api/evidence/${id}/download`;
+    },
+    async upload(
+      caseId: string,
+      file: File,
+      description?: string,
+    ): Promise<void> {
+      const form = new FormData();
+      form.append("file", file);
+      if (description) form.append("description", description);
+      const res = await fetch(`${BASE}/api/cases/${caseId}/evidence`, {
+        method: "POST",
+        body: form,
+      });
+      if (!res.ok) {
+        const detail = await res.text();
+        throw new Error(`Upload failed (${res.status}): ${detail}`);
+      }
+    },
+    delete: (id: string) => del(`/api/evidence/${id}`),
   },
   rules: {
     list: () => get<RuleListResponse>("/api/rules"),

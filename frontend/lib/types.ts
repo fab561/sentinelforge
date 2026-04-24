@@ -122,6 +122,24 @@ export interface MttrTrendPoint {
   resolved_count: number;
 }
 
+export interface Evidence {
+  id: string;
+  case_id: string;
+  kind: string;           // file | cowrie_session | pcap | screenshot | note
+  filename: string;
+  content_type: string;
+  size_bytes: number;
+  sha256: string;
+  description: string | null;
+  uploaded_by: string | null;
+  created_at: string;
+}
+
+export interface EvidenceListResponse {
+  items: Evidence[];
+  total: number;
+}
+
 export interface MttrStatsResponse {
   mtta_median_seconds: number | null;
   mtta_p95_seconds: number | null;

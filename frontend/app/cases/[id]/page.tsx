@@ -2,6 +2,7 @@ import { api } from "@/lib/api";
 import { SeverityBadge } from "@/components/SeverityBadge";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { EvidencePanel } from "@/components/EvidencePanel";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
@@ -50,6 +51,8 @@ export default async function CaseDetailPage({
           {c.assigned_to && <KV label="Assigned To" value={c.assigned_to} />}
         </CardContent>
       </Card>
+
+      <EvidencePanel caseId={c.id} />
     </div>
   );
 }

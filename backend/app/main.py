@@ -16,6 +16,24 @@ logger = logging.getLogger("sentinelforge")
 async def lifespan(app: FastAPI):
     logger.info("SentinelForge backend starting...")
 
+    # Create any missing tables. Idempotent (CREATE TABLE IF NOT EXISTS)
+    # so running repeatedly on an already-migrated DB is a no-op. Real
+    # schema evolution still belongs in alembic; this catches the case
+    # where a new model landed and we haven't added a migration yet.
+    from app.core.database import engine
+    from app.models import Alert, AuditLog, Case, Evidence, Rule, User  # noqa: F401
+    from app.models.base import Base
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    # MinIO bucket for case evidence attachments. Logged on create, silent
+    # on the common already-exists path.
+    try:
+        from app.core.storage import ensure_bucket
+        await ensure_bucket()
+    except Exception as exc:
+        logger.warning("MinIO bucket init failed: %s (evidence uploads will fail until fixed)", exc)
+
     # Start the Wazuh alert poller in background
     from app.ingestion.wazuh_poller import start_poller
     poller_task = asyncio.create_task(start_poller())

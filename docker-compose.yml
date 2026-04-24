@@ -140,11 +140,16 @@ services:
       SECRET_KEY: ${SECRET_KEY:-changeme-in-production}
       DEBUG: ${DEBUG:-true}
       POLL_INTERVAL: ${POLL_INTERVAL:-30}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio:9000}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-sf_admin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-changeme-minio-pw}
+      MINIO_BUCKET: ${MINIO_BUCKET:-sentinelforge-evidence}
     depends_on:
       - postgres
       - redis
       - wazuh-manager
       - wazuh-indexer
+      - minio
     volumes:
       - ./backend:/app
     networks:
@@ -204,6 +209,11 @@ services:
       ABUSEIPDB_API_KEY: ${ABUSEIPDB_API_KEY:-}
       GREYNOISE_API_KEY: ${GREYNOISE_API_KEY:-}
       OTX_API_KEY: ${OTX_API_KEY:-}
+      # Evidence storage
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio:9000}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-sf_admin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-changeme-minio-pw}
+      MINIO_BUCKET: ${MINIO_BUCKET:-sentinelforge-evidence}
       # Enrichment tuning
       ENRICHMENT_CACHE_TTL: ${ENRICHMENT_CACHE_TTL:-3600}
       ENRICHMENT_CONCURRENT_LIMIT: ${ENRICHMENT_CONCURRENT_LIMIT:-5}
@@ -248,6 +258,23 @@ services:
     networks:
       - sentinelforge
 
+  # ─── MinIO — S3-compatible object storage for case evidence ────
+  minio:
+    image: minio/minio:latest
+    container_name: sf-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    ports:
+      - "9100:9000"   # S3 API (9000 is taken by wazuh-indexer on host)
+      - "9101:9001"   # MinIO web console
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-sf_admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-changeme-minio-pw}
+    volumes:
+      - minio-data:/data
+    networks:
+      - sentinelforge
+
 volumes:
   wazuh-indexer-data:
   wazuh-api-config:
@@ -265,6 +292,7 @@ volumes:
   redis-data:
   cowrie-logs:    # shared between cowrie + wazuh-agent
   cowrie-data:
+  minio-data:
 
 networks:
   sentinelforge:
