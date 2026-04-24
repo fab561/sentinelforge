@@ -75,7 +75,7 @@ export default async function AlertsPage({
                   </TableCell>
                   <TableCell className="py-2.5">
                     <Link
-                      href={`/alerts/${alert.id}`}
+                      href={`/alerts/${alert.alert_id}`}
                       className="text-xs font-medium hover:text-primary hover:underline"
                     >
                       {alert.title}

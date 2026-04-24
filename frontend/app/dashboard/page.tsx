@@ -123,7 +123,7 @@ export default async function DashboardPage() {
               alertsRes.items.map((a) => (
                 <Link
                   key={a.id}
-                  href={`/alerts/${a.id}`}
+                  href={`/alerts/${a.alert_id}`}
                   className="flex items-start justify-between rounded-md px-2 py-2 hover:bg-accent transition-colors"
                 >
                   <div className="space-y-0.5 min-w-0">
