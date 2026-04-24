@@ -151,4 +151,206 @@
     <group>file_integrity,sentinelforge,</group>
   </rule>
 
+  <!-- ===== RECONNAISSANCE ===== -->
+
+  <!-- Port scan: many connection attempts from one IP in a short window -->
+  <rule id="100250" level="10" frequency="20" timeframe="60">
+    <if_matched_sid>5706</if_matched_sid>
+    <same_source_ip />
+    <description>Recon: Port scan suspected (20+ probes in 60s from same IP)</description>
+    <mitre>
+      <id>T1046</id>
+    </mitre>
+    <group>recon,sentinelforge,</group>
+  </rule>
+
+  <!-- Recon tool signatures in user-agent or command line -->
+  <rule id="100251" level="10">
+    <if_group>syslog</if_group>
+    <regex>nmap |masscan |zmap |nikto |dirb |gobuster |wpscan </regex>
+    <description>Recon: Known scanning tool invocation detected</description>
+    <mitre>
+      <id>T1595</id>
+    </mitre>
+    <group>recon,sentinelforge,</group>
+  </rule>
+
+  <!-- ===== INITIAL ACCESS ===== -->
+
+  <!-- Web shell pattern: common PHP/JSP backdoor hash -->
+  <rule id="100252" level="14">
+    <if_sid>554</if_sid>
+    <regex>\.(php|phtml|jsp|aspx)$</regex>
+    <match>/var/www/|/srv/www/|/usr/share/nginx/html/</match>
+    <description>Initial Access: Possible web shell uploaded to web root</description>
+    <mitre>
+      <id>T1505.003</id>
+    </mitre>
+    <group>initial_access,web_attack,sentinelforge,</group>
+  </rule>
+
+  <!-- Successful SSH login from external (public) IP -->
+  <rule id="100253" level="10">
+    <if_sid>5715</if_sid>
+    <regex>from (?!10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|127\.)</regex>
+    <description>Initial Access: Successful SSH login from external IP</description>
+    <mitre>
+      <id>T1078</id>
+    </mitre>
+    <group>initial_access,authentication_success,sentinelforge,</group>
+  </rule>
+
+  <!-- ===== PERSISTENCE ===== -->
+
+  <!-- New cron job added -->
+  <rule id="100254" level="12">
+    <if_sid>550</if_sid>
+    <match>/etc/cron.d/|/etc/crontab|/var/spool/cron/</match>
+    <description>Persistence: New/modified cron job detected</description>
+    <mitre>
+      <id>T1053.003</id>
+    </mitre>
+    <group>persistence,sentinelforge,</group>
+  </rule>
+
+  <!-- SSH authorized_keys modified -->
+  <rule id="100255" level="13">
+    <if_sid>550</if_sid>
+    <match>/.ssh/authorized_keys</match>
+    <description>Persistence: SSH authorized_keys file modified</description>
+    <mitre>
+      <id>T1098.004</id>
+    </mitre>
+    <group>persistence,sentinelforge,</group>
+  </rule>
+
+  <!-- New user account created -->
+  <rule id="100256" level="11">
+    <if_group>syslog</if_group>
+    <match>new user:|useradd[</match>
+    <description>Persistence: New user account created</description>
+    <mitre>
+      <id>T1136.001</id>
+    </mitre>
+    <group>persistence,sentinelforge,</group>
+  </rule>
+
+  <!-- Systemd service added / modified -->
+  <rule id="100257" level="11">
+    <if_sid>550</if_sid>
+    <match>/etc/systemd/system/|/lib/systemd/system/</match>
+    <description>Persistence: systemd service unit created or modified</description>
+    <mitre>
+      <id>T1543.002</id>
+    </mitre>
+    <group>persistence,sentinelforge,</group>
+  </rule>
+
+  <!-- ===== DEFENSE EVASION ===== -->
+
+  <!-- Wazuh agent stopped or restarted unexpectedly -->
+  <rule id="100260" level="13">
+    <if_group>syslog</if_group>
+    <regex>wazuh-agentd.*(stopped|killed|terminated)</regex>
+    <description>Defense Evasion: Wazuh agent stopped — possible tampering</description>
+    <mitre>
+      <id>T1562.001</id>
+    </mitre>
+    <group>defense_evasion,sentinelforge,</group>
+  </rule>
+
+  <!-- Log file cleared / truncated -->
+  <rule id="100261" level="13">
+    <if_group>syslog</if_group>
+    <regex>&gt; /var/log/|: /var/log/\S+ (truncated|cleared)</regex>
+    <description>Defense Evasion: System log file cleared or truncated</description>
+    <mitre>
+      <id>T1070.002</id>
+    </mitre>
+    <group>defense_evasion,sentinelforge,</group>
+  </rule>
+
+  <!-- Firewall rules flushed -->
+  <rule id="100262" level="13">
+    <if_group>syslog</if_group>
+    <regex>iptables -F|iptables --flush|ufw disable|systemctl stop firewalld</regex>
+    <description>Defense Evasion: Host firewall disabled or rules flushed</description>
+    <mitre>
+      <id>T1562.004</id>
+    </mitre>
+    <group>defense_evasion,sentinelforge,</group>
+  </rule>
+
+  <!-- Bash history cleared -->
+  <rule id="100263" level="11">
+    <if_group>syslog</if_group>
+    <regex>history -c|&gt; ~/.bash_history|rm .*\.bash_history</regex>
+    <description>Defense Evasion: Shell history cleared</description>
+    <mitre>
+      <id>T1070.003</id>
+    </mitre>
+    <group>defense_evasion,sentinelforge,</group>
+  </rule>
+
+  <!-- ===== CREDENTIAL ACCESS ===== -->
+
+  <!-- /etc/shadow read -->
+  <rule id="100270" level="13">
+    <if_group>syslog</if_group>
+    <regex>(cat|less|more|head|tail|grep) .*/etc/shadow</regex>
+    <description>Credential Access: /etc/shadow read attempt</description>
+    <mitre>
+      <id>T1003.008</id>
+    </mitre>
+    <group>credential_access,sentinelforge,</group>
+  </rule>
+
+  <!-- ===== COMMAND AND CONTROL ===== -->
+
+  <!-- Reverse shell spawn pattern -->
+  <rule id="100280" level="15">
+    <if_group>syslog</if_group>
+    <regex>bash -i &gt;&amp;? /dev/tcp/|nc -[el]*e .*/bin/(ba)?sh|python -c 'import socket</regex>
+    <description>C2: Reverse shell command pattern detected</description>
+    <mitre>
+      <id>T1059.004</id>
+    </mitre>
+    <group>command_and_control,sentinelforge,</group>
+  </rule>
+
+  <!-- Base64-encoded command execution (often used to hide payloads) -->
+  <rule id="100281" level="12">
+    <if_group>syslog</if_group>
+    <regex>(bash|sh) .*-c .*base64 -d|echo [A-Za-z0-9+/]{40,}=* \| base64 -d</regex>
+    <description>C2: Base64-encoded command execution — obfuscation suspected</description>
+    <mitre>
+      <id>T1027</id>
+    </mitre>
+    <group>command_and_control,defense_evasion,sentinelforge,</group>
+  </rule>
+
+  <!-- ===== IMPACT ===== -->
+
+  <!-- Cryptominer process signatures -->
+  <rule id="100290" level="14">
+    <if_group>syslog</if_group>
+    <regex>xmrig|minerd|cpuminer|coinhive|cryptonight|stratum\+tcp</regex>
+    <description>Impact: Cryptocurrency miner process detected</description>
+    <mitre>
+      <id>T1496</id>
+    </mitre>
+    <group>impact,malware,sentinelforge,</group>
+  </rule>
+
+  <!-- Mass file deletion / destructive command -->
+  <rule id="100291" level="15">
+    <if_group>syslog</if_group>
+    <regex>rm -rf / |dd if=/dev/(zero|random) of=/dev/[sh]d|mkfs\.</regex>
+    <description>Impact: Destructive command detected (mass delete / disk wipe)</description>
+    <mitre>
+      <id>T1485</id>
+    </mitre>
+    <group>impact,sentinelforge,</group>
+  </rule>
+
 </group>

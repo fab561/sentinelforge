@@ -415,10 +415,73 @@ SAMPLE_ALERTS = [
     },
 ]
 
+def _wz(rule_id: str, level: int, desc: str, *, sev: str, mitre: list[str], match: str | None = None, regex: str | None = None) -> dict:
+    """Compact builder for Wazuh-type rule seeds — keeps SAMPLE_RULES readable."""
+    definition: dict = {"rule_id": rule_id, "level": level, "description": desc}
+    if match:
+        definition["match"] = match
+    if regex:
+        definition["regex"] = regex
+    return {
+        "name": desc,
+        "description": desc,
+        "rule_type": "wazuh",
+        "definition": definition,
+        "severity": sev,
+        "enabled": True,
+        "mitre_techniques": mitre,
+    }
+
+
+# Rule catalog — mirrors wazuh/custom_rules/sentinelforge_rules.xml. The XML
+# file drives actual detection; this list surfaces them in the /rules page
+# so analysts can see coverage at a glance + flip them on/off from the UI.
 SAMPLE_RULES = [
+    # ── Honeypot (M5) ──────────────────────────────────────────────
+    _wz("100200", 12, "Honeypot: Connection detected on agent",     sev="critical", mitre=["T1046"], match="agent.name:rpi-honeypot"),
+    _wz("100201", 14, "Honeypot: SSH login attempt (Cowrie)",       sev="high",     mitre=["T1110"]),
+    _wz("100202", 15, "Honeypot: Commands executed after login",    sev="critical", mitre=["T1059.004"]),
+    _wz("100203", 15, "Honeypot: File download attempted",          sev="critical", mitre=["T1105"]),
+    # ── Credential Access — SSH Brute Force ────────────────────────
+    _wz("100210", 13, "SSH: Aggressive brute force (10+ failures/60s, same IP)",  sev="high",     mitre=["T1110.001"]),
+    _wz("100211", 12, "SSH: Distributed brute force (5+ failures/120s)",          sev="high",     mitre=["T1110.003"]),
+    # ── Execution ──────────────────────────────────────────────────
+    _wz("100220", 10, "Suspicious: wget/curl downloading from URL",   sev="medium", mitre=["T1105"], regex="https?://"),
+    _wz("100221", 12, "Suspicious: Downloaded file made executable",  sev="high",   mitre=["T1059.004"]),
+    # ── Privilege Escalation ───────────────────────────────────────
+    _wz("100230", 11, "Privilege Escalation: Repeated sudo failures", sev="medium", mitre=["T1548.003"]),
+    _wz("100231", 10, "Privilege Escalation: Failed su attempt",      sev="medium", mitre=["T1548"]),
+    # ── File Integrity ─────────────────────────────────────────────
+    _wz("100240", 12, "FIM: Critical system config file modified",    sev="high",   mitre=["T1098"]),
+    _wz("100241", 10, "FIM: New file created in /tmp",                sev="medium", mitre=["T1059"]),
+    # ── Reconnaissance ─────────────────────────────────────────────
+    _wz("100250", 10, "Recon: Port scan suspected (20+ probes/60s)",  sev="medium", mitre=["T1046"]),
+    _wz("100251", 10, "Recon: Known scanning tool invocation",        sev="medium", mitre=["T1595"]),
+    # ── Initial Access ─────────────────────────────────────────────
+    _wz("100252", 14, "Initial Access: Possible web shell upload",    sev="critical", mitre=["T1505.003"]),
+    _wz("100253", 10, "Initial Access: SSH login from external IP",   sev="medium", mitre=["T1078"]),
+    # ── Persistence ────────────────────────────────────────────────
+    _wz("100254", 12, "Persistence: New/modified cron job",           sev="high",   mitre=["T1053.003"]),
+    _wz("100255", 13, "Persistence: authorized_keys modified",        sev="high",   mitre=["T1098.004"]),
+    _wz("100256", 11, "Persistence: New user account created",        sev="medium", mitre=["T1136.001"]),
+    _wz("100257", 11, "Persistence: systemd unit created/modified",   sev="medium", mitre=["T1543.002"]),
+    # ── Defense Evasion ────────────────────────────────────────────
+    _wz("100260", 13, "Evasion: Wazuh agent stopped (tampering)",     sev="high",   mitre=["T1562.001"]),
+    _wz("100261", 13, "Evasion: Log file cleared/truncated",          sev="high",   mitre=["T1070.002"]),
+    _wz("100262", 13, "Evasion: Host firewall disabled",              sev="high",   mitre=["T1562.004"]),
+    _wz("100263", 11, "Evasion: Shell history cleared",               sev="medium", mitre=["T1070.003"]),
+    # ── Credential Access ──────────────────────────────────────────
+    _wz("100270", 13, "Cred Access: /etc/shadow read attempt",        sev="high",   mitre=["T1003.008"]),
+    # ── Command & Control ──────────────────────────────────────────
+    _wz("100280", 15, "C2: Reverse shell command pattern",            sev="critical", mitre=["T1059.004"]),
+    _wz("100281", 12, "C2: Base64-encoded command (obfuscation)",     sev="high",   mitre=["T1027"]),
+    # ── Impact ─────────────────────────────────────────────────────
+    _wz("100290", 14, "Impact: Cryptocurrency miner detected",        sev="critical", mitre=["T1496"]),
+    _wz("100291", 15, "Impact: Destructive command (mass delete/wipe)", sev="critical", mitre=["T1485"]),
+    # ── Cross-platform (Sigma-style description) ───────────────────
     {
-        "name": "SSH Brute Force Detection",
-        "description": "Detects multiple failed SSH login attempts from the same source IP within a short time window",
+        "name": "SSH Brute Force (Sigma)",
+        "description": "Cross-platform Sigma rule — multiple failed SSH auth from same source within a window",
         "rule_type": "sigma",
         "definition": {
             "title": "SSH Brute Force",
@@ -432,20 +495,6 @@ SAMPLE_RULES = [
         "severity": "high",
         "enabled": True,
         "mitre_techniques": ["T1110.001", "T1110.003"],
-    },
-    {
-        "name": "Honeypot Connection Alert",
-        "description": "Any connection to the honeypot is suspicious — legitimate users have no reason to connect",
-        "rule_type": "wazuh",
-        "definition": {
-            "rule_id": "100200",
-            "level": 12,
-            "description": "Connection to honeypot detected",
-            "match": "agent.name:rpi-honeypot",
-        },
-        "severity": "critical",
-        "enabled": True,
-        "mitre_techniques": ["T1046"],
     },
 ]
 
