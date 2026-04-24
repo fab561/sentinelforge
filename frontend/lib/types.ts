@@ -115,6 +115,25 @@ export interface MitreStatsResponse {
   tactics: MitreTacticGroup[];
 }
 
+export interface MttrTrendPoint {
+  day: string;
+  mtta_median_seconds: number | null;
+  mttr_median_seconds: number | null;
+  resolved_count: number;
+}
+
+export interface MttrStatsResponse {
+  mtta_median_seconds: number | null;
+  mtta_p95_seconds: number | null;
+  mttr_median_seconds: number | null;
+  mttr_p95_seconds: number | null;
+  open_cases: number;
+  acknowledged_cases: number;
+  resolved_cases: number;
+  closed_cases: number;
+  trend: MttrTrendPoint[];
+}
+
 export interface WazuhAgent {
   id: string;
   name: string;

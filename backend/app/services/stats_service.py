@@ -11,6 +11,8 @@ from app.schemas.stats import (
     MitreStatsResponse,
     MitreTacticGroup,
     MitreTechniqueCount,
+    MttrStatsResponse,
+    MttrTrendPoint,
     SeverityCount,
     StatsResponse,
     TrendPoint,
@@ -171,4 +173,97 @@ async def get_mitre_stats(db: AsyncSession) -> MitreStatsResponse:
         total_mapped=total_mapped,
         total_unmapped=total_unmapped,
         tactics=tactics,
+    )
+
+
+async def get_mttr_stats(db: AsyncSession) -> MttrStatsResponse:
+    """Mean/median time-to-acknowledge and time-to-resolve over all cases
+    plus a 14-day rolling trend, computed entirely in Postgres.
+
+    MTTA = acknowledged_at - created_at
+    MTTR = resolved_at - created_at
+
+    Uses percentile_cont for medians + p95 so tail latency is visible —
+    a SOC cares more about the worst 5% of cases than the happy path.
+    """
+    # Overall medians + p95
+    row = (
+        await db.execute(
+            text(
+                """
+                SELECT
+                  percentile_cont(0.5) WITHIN GROUP (
+                    ORDER BY EXTRACT(EPOCH FROM (acknowledged_at - created_at))
+                  ) FILTER (WHERE acknowledged_at IS NOT NULL)  AS mtta_median,
+                  percentile_cont(0.95) WITHIN GROUP (
+                    ORDER BY EXTRACT(EPOCH FROM (acknowledged_at - created_at))
+                  ) FILTER (WHERE acknowledged_at IS NOT NULL)  AS mtta_p95,
+                  percentile_cont(0.5) WITHIN GROUP (
+                    ORDER BY EXTRACT(EPOCH FROM (resolved_at - created_at))
+                  ) FILTER (WHERE resolved_at IS NOT NULL)      AS mttr_median,
+                  percentile_cont(0.95) WITHIN GROUP (
+                    ORDER BY EXTRACT(EPOCH FROM (resolved_at - created_at))
+                  ) FILTER (WHERE resolved_at IS NOT NULL)      AS mttr_p95
+                FROM cases
+                """
+            )
+        )
+    ).one()
+
+    # Status snapshot counts. An "acknowledged" case = investigating (picked
+    # up by analyst) and still open; resolved/closed moved past that stage.
+    status_rows = (
+        await db.execute(
+            select(Case.status, func.count(Case.id)).group_by(Case.status)
+        )
+    ).all()
+    status_map = dict(status_rows)
+
+    # 14-day rolling trend. Bucket cases by resolution day (or by created day
+    # if still open) so the chart shows today's SLA health, not a frozen history.
+    now = datetime.now(timezone.utc)
+    since = now - timedelta(days=14)
+    trend_rows = (
+        await db.execute(
+            text(
+                """
+                SELECT
+                  date_trunc('day', created_at)::date AS day,
+                  percentile_cont(0.5) WITHIN GROUP (
+                    ORDER BY EXTRACT(EPOCH FROM (acknowledged_at - created_at))
+                  ) FILTER (WHERE acknowledged_at IS NOT NULL) AS mtta,
+                  percentile_cont(0.5) WITHIN GROUP (
+                    ORDER BY EXTRACT(EPOCH FROM (resolved_at - created_at))
+                  ) FILTER (WHERE resolved_at IS NOT NULL) AS mttr,
+                  COUNT(*) FILTER (WHERE resolved_at IS NOT NULL) AS resolved
+                FROM cases
+                WHERE created_at >= :since
+                GROUP BY day
+                ORDER BY day
+                """
+            ),
+            {"since": since},
+        )
+    ).all()
+
+    trend = [
+        MttrTrendPoint(
+            day=d.isoformat(),
+            mtta_median_seconds=float(mtta) if mtta is not None else None,
+            mttr_median_seconds=float(mttr) if mttr is not None else None,
+            resolved_count=resolved,
+        )
+        for d, mtta, mttr, resolved in trend_rows
+    ]
+
+    return MttrStatsResponse(
+        mtta_median_seconds=float(row.mtta_median) if row.mtta_median is not None else None,
+        mtta_p95_seconds=float(row.mtta_p95) if row.mtta_p95 is not None else None,
+        mttr_median_seconds=float(row.mttr_median) if row.mttr_median is not None else None,
+        mttr_p95_seconds=float(row.mttr_p95) if row.mttr_p95 is not None else None,
+        open_cases=status_map.get("open", 0),
+        acknowledged_cases=status_map.get("investigating", 0),
+        resolved_cases=status_map.get("resolved", 0),
+        closed_cases=status_map.get("closed", 0),
+        trend=trend,
     )

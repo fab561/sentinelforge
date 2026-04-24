@@ -31,6 +31,9 @@ class CaseResponse(BaseModel):
     created_by: UUID | None
     created_at: datetime
     updated_at: datetime
+    acknowledged_at: datetime | None = None
+    resolved_at: datetime | None = None
+    closed_at: datetime | None = None
 
     model_config = {"from_attributes": True}
 

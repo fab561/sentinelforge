@@ -51,3 +51,27 @@ class MitreStatsResponse(BaseModel):
     total_mapped: int                 # alerts with any mitre data
     total_unmapped: int               # alerts missing mitre
     tactics: list[MitreTacticGroup]
+
+
+class MttrTrendPoint(BaseModel):
+    day: str                          # ISO date
+    mtta_median_seconds: float | None
+    mttr_median_seconds: float | None
+    resolved_count: int
+
+
+class MttrStatsResponse(BaseModel):
+    # Overall medians over the full history (and p95 for tail visibility)
+    mtta_median_seconds: float | None
+    mtta_p95_seconds: float | None
+    mttr_median_seconds: float | None
+    mttr_p95_seconds: float | None
+
+    # Case counts in each lifecycle stage (snapshots, not durations)
+    open_cases: int
+    acknowledged_cases: int     # investigating but not resolved
+    resolved_cases: int
+    closed_cases: int
+
+    # 14-day rolling trend (one point per calendar day)
+    trend: list[MttrTrendPoint]

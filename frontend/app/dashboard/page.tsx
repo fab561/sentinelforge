@@ -13,14 +13,25 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { AlertTrendChart } from "./AlertTrendChart";
+import { MttrTrendChart } from "./MttrTrendChart";
 
 export const dynamic = "force-dynamic";
 
+// Seconds → compact "3m", "1.5h", "2.1d" for dashboard stat cards.
+function fmtDuration(seconds: number | null | undefined): string {
+  if (seconds === null || seconds === undefined) return "—";
+  if (seconds < 60) return `${Math.round(seconds)}s`;
+  if (seconds < 3600) return `${Math.round(seconds / 60)}m`;
+  if (seconds < 86400) return `${(seconds / 3600).toFixed(1)}h`;
+  return `${(seconds / 86400).toFixed(1)}d`;
+}
+
 export default async function DashboardPage() {
-  const [stats, alertsRes, casesRes] = await Promise.all([
+  const [stats, alertsRes, casesRes, mttr] = await Promise.all([
     api.stats.get().catch(() => null),
     api.alerts.list({ page: 1, page_size: 5 }).catch(() => null),
     api.cases.list({ page: 1, page_size: 5 }).catch(() => null),
+    api.stats.mttr().catch(() => null),
   ]);
 
   return (
@@ -68,6 +79,43 @@ export default async function DashboardPage() {
               total={stats.total_alerts}
             />
           ))}
+        </div>
+      )}
+
+      {/* SLA row: MTTA + MTTR + trend. Three-up on wide, stacks on mobile. */}
+      {mttr && (
+        <div className="grid gap-4 lg:grid-cols-3">
+          <StatCard
+            label="MTTA (median)"
+            value={fmtDuration(mttr.mtta_median_seconds)}
+            icon={<Clock className="h-4 w-4 text-cyan-400" />}
+            sub={`p95: ${fmtDuration(mttr.mtta_p95_seconds)}`}
+          />
+          <StatCard
+            label="MTTR (median)"
+            value={fmtDuration(mttr.mttr_median_seconds)}
+            icon={<ShieldCheck className="h-4 w-4 text-primary" />}
+            sub={`p95: ${fmtDuration(mttr.mttr_p95_seconds)}`}
+          />
+          <Card className="bg-card border-border">
+            <CardHeader className="pb-1">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-primary" />
+                SLA Trend — 14d
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0">
+              {mttr.trend.some(
+                (p) => p.mtta_median_seconds !== null || p.mttr_median_seconds !== null,
+              ) ? (
+                <MttrTrendChart data={mttr.trend} />
+              ) : (
+                <p className="text-[11px] text-muted-foreground py-8 text-center">
+                  No resolved cases yet — trend appears once analysts start closing cases.
+                </p>
+              )}
+            </CardContent>
+          </Card>
         </div>
       )}
 

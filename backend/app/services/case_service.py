@@ -100,16 +100,33 @@ async def create_case(
     return case
 
 
+_ACK_STATUSES = {"investigating", "resolved", "closed"}
+_RESOLVED_STATUSES = {"resolved", "closed"}
+
+
 async def update_case(db: AsyncSession, case_id: UUID, data: CaseUpdate) -> Case | None:
     case = await get_case(db, case_id)
     if not case:
         return None
 
     update_data = data.model_dump(exclude_unset=True)
+    new_status = update_data.get("status")
+
     for key, value in update_data.items():
         setattr(case, key, value)
 
-    case.updated_at = datetime.now(timezone.utc)
+    # Stamp lifecycle timestamps on first transition into each stage. Never
+    # overwrite — if a case is re-opened and re-resolved, MTTR keeps the
+    # first-resolution duration (which is the meaningful SLA figure).
+    now = datetime.now(timezone.utc)
+    if new_status in _ACK_STATUSES and case.acknowledged_at is None:
+        case.acknowledged_at = now
+    if new_status in _RESOLVED_STATUSES and case.resolved_at is None:
+        case.resolved_at = now
+    if new_status == "closed" and case.closed_at is None:
+        case.closed_at = now
+
+    case.updated_at = now
     await db.commit()
     await db.refresh(case)
     return case
