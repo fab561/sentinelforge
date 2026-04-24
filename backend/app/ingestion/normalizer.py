@@ -67,7 +67,7 @@ def normalize_wazuh_alert(raw: dict) -> dict:
 
     # Build observables
     observables = {
-        "source_ip": data.get("srcip") or raw.get("data", {}).get("src_ip"),
+        "source_ip": data.get("srcip") or data.get("src_ip"),
         "destination_ip": data.get("dstip") or data.get("dst_ip"),
         "source_port": data.get("srcport"),
         "destination_port": data.get("dstport"),
@@ -81,15 +81,24 @@ def normalize_wazuh_alert(raw: dict) -> dict:
     # Remove None values
     observables = {k: v for k, v in observables.items() if v is not None}
 
-    # Build MITRE info
+    # Build MITRE info.
+    # Wazuh rule.mitre.id is a flat list of technique IDs (e.g. ["T1110", "T1078"]).
+    # A sub-technique is indicated by a dot-suffix (e.g. "T1110.001" is a sub of T1110).
     mitre_info = None
     if mitre:
         tactics = mitre.get("tactic", [])
         techniques = mitre.get("id", [])
+        primary_technique: str | None = None
+        subtechnique: str | None = None
+        if techniques:
+            primary_technique = techniques[0]
+            if "." in primary_technique:
+                subtechnique = primary_technique
+                primary_technique = primary_technique.split(".", 1)[0]
         mitre_info = {
             "tactic": tactics[0] if tactics else None,
-            "technique": techniques[0] if techniques else None,
-            "subtechnique": techniques[1] if len(techniques) > 1 else None,
+            "technique": primary_technique,
+            "subtechnique": subtechnique,
         }
 
     groups = rule.get("groups", [])

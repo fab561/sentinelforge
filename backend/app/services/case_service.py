@@ -1,7 +1,8 @@
+import re
 from datetime import datetime, timezone
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.alert import Alert
@@ -9,9 +10,27 @@ from app.models.case import Case
 from app.schemas.case import CaseCreate, CaseListResponse, CaseResponse, CaseUpdate
 
 
-def _next_case_number(count: int) -> str:
+async def _next_case_number(db: AsyncSession) -> str:
+    """Return the next sequential case number for the current year.
+
+    Uses MAX(...) over existing numbers so it stays correct even after
+    deletions, and takes a transaction-scoped advisory lock to serialize
+    concurrent creators (prevents duplicate case_number on race).
+    """
     year = datetime.now(timezone.utc).year
-    return f"CASE-{year}-{count + 1:04d}"
+    # pg_advisory_xact_lock keyed on the year — released at COMMIT/ROLLBACK
+    await db.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": year})
+    pattern = f"CASE-{year}-%"
+    result = await db.execute(
+        select(func.max(Case.case_number)).where(Case.case_number.like(pattern))
+    )
+    latest = result.scalar_one_or_none()
+    next_num = 1
+    if latest:
+        m = re.search(r"(\d+)$", latest)
+        if m:
+            next_num = int(m.group(1)) + 1
+    return f"CASE-{year}-{next_num:04d}"
 
 
 async def list_cases(
@@ -50,17 +69,20 @@ async def get_case(db: AsyncSession, case_id: UUID) -> Case | None:
     return result.scalar_one_or_none()
 
 
-async def create_case(db: AsyncSession, data: CaseCreate) -> Case:
-    # Generate sequential case number
-    count_result = await db.execute(select(func.count(Case.id)))
-    count = count_result.scalar_one()
+async def create_case(
+    db: AsyncSession,
+    data: CaseCreate,
+    created_by: UUID | None = None,
+) -> Case:
+    case_number = await _next_case_number(db)
 
     case = Case(
-        case_number=_next_case_number(count),
+        case_number=case_number,
         title=data.title,
         description=data.description,
         severity=data.severity,
         assigned_to=data.assigned_to,
+        created_by=created_by,
     )
     db.add(case)
     await db.flush()

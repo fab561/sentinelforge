@@ -54,19 +54,14 @@ async def update_alert(
     return alert
 
 
-@router.get("/queue/next")
-async def get_next_from_queue(
-    db: AsyncSession = Depends(get_db),
-):
-    """Pop the next un-enriched alert from Redis queue.
-    Used by Module 2 enrichment pipeline.
+@router.get("/queue/stats")
+async def queue_stats():
+    """Return current enrichment/playbook queue depths (read-only observability).
+
+    The enrichment worker is the sole consumer of the pending_enrichment
+    queue — providing a pop endpoint would race with it, so we only expose
+    depths here.
     """
-    from app.core.redis import get_redis
+    from app.ingestion.queue import get_queue_lengths
 
-    redis = await get_redis()
-    result = await redis.rpop("alerts:pending_enrichment")
-    if not result:
-        return {"alert": None, "message": "Queue empty"}
-
-    import json
-    return {"alert": json.loads(result)}
+    return await get_queue_lengths()

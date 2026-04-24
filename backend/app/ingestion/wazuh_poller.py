@@ -32,29 +32,30 @@ async def poll_once() -> int:
 
         latest_timestamp = checkpoint
 
+        # Persist all alerts first, then push to Redis only after COMMIT
+        # succeeds. Avoids split-brain where the queue references an
+        # alert_id that was never persisted due to rollback.
+        newly_persisted: list[dict] = []
         async with async_session() as db:
             for raw in raw_alerts:
                 normalized = normalize_wazuh_alert(raw)
 
-                # Deduplicate — skip if alert_id already exists
                 existing = await get_alert(db, normalized["alert_id"])
                 if existing:
                     continue
 
-                # Save to PostgreSQL
-                alert = Alert(**normalized)
-                db.add(alert)
+                db.add(Alert(**normalized))
+                newly_persisted.append(normalized)
 
-                # Push to enrichment queue
-                await push_for_enrichment(normalized)
-                count += 1
-
-                # Track latest timestamp for checkpoint
                 ts = raw.get("timestamp", "")
                 if ts and (not latest_timestamp or ts > latest_timestamp):
                     latest_timestamp = ts
 
             await db.commit()
+
+        for normalized in newly_persisted:
+            await push_for_enrichment(normalized)
+            count += 1
 
         # Update checkpoint
         if latest_timestamp and latest_timestamp != checkpoint:

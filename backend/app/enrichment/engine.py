@@ -134,8 +134,8 @@ class EnrichmentEngine:
             logger.info("[%s] No enrichable observables found", alert_id)
             return _empty_enrichment(alert_id)
 
-        # Build tasks: (obs_type, value, provider_name) for all combinations
-        tasks: list[tuple[str, str, str, asyncio.coroutines]] = []
+        # Build tasks: (obs_type, value, provider_name, awaitable) per combo
+        tasks: list[tuple[str, str, str, Any]] = []
         for obs_type, value in observables:
             provider_names = _PROVIDER_MAP.get(obs_type, [])
             for pname in provider_names:
