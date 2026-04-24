@@ -84,12 +84,18 @@ async def _process_one(engine: PlaybookEngine, alert_data: dict) -> None:
             existing_actions: list = existing.playbook_actions or []
             merged_actions = existing_actions + action_results
 
-            from uuid import UUID
-            update_data = AlertUpdate(
-                playbook_actions=merged_actions,
-                status=final_status or "escalated",
-                case_id=UUID(new_case_id) if new_case_id else None,
-            )
+            # Only include case_id in the update when this run actually
+            # created a case — AlertUpdate uses exclude_unset, so passing
+            # None explicitly would wipe any pre-existing case link.
+            update_kwargs: dict = {
+                "playbook_actions": merged_actions,
+                "status": final_status or "escalated",
+            }
+            if new_case_id:
+                from uuid import UUID
+                update_kwargs["case_id"] = UUID(new_case_id)
+
+            update_data = AlertUpdate(**update_kwargs)
             await update_alert(db, alert_id, update_data)
 
     except Exception as exc:
