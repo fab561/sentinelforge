@@ -9,6 +9,7 @@ import {
   Shield,
   Cpu,
   Crosshair,
+  ScrollText,
   ShieldAlert,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -20,6 +21,7 @@ const nav = [
   { href: "/rules",     label: "Rules",     icon: Shield },
   { href: "/mitre",     label: "MITRE",     icon: Crosshair },
   { href: "/agents",    label: "Agents",    icon: Cpu },
+  { href: "/audit",     label: "Audit Log", icon: ScrollText },
 ];
 
 export function Sidebar() {

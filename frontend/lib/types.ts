@@ -122,6 +122,21 @@ export interface MttrTrendPoint {
   resolved_count: number;
 }
 
+export interface AuditLogEntry {
+  id: string;
+  action: string;
+  entity_type: string | null;
+  entity_id: string | null;
+  details: Record<string, unknown> | null;
+  performed_by: string | null;
+  created_at: string;
+}
+
+export interface AuditLogListResponse {
+  items: AuditLogEntry[];
+  total: number;
+}
+
 export interface Evidence {
   id: string;
   case_id: string;

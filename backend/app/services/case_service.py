@@ -132,6 +132,14 @@ async def attach_alert_to_case(
     if alert is None:
         return None
     alert.case_id = case_id
+    from app.services import audit_service
+    await audit_service.log(
+        db=db,
+        action="case.alert.correlated",
+        entity_type="case",
+        entity_id=case_id,
+        details={"alert_id": alert_id},
+    )
     await db.commit()
     await db.refresh(alert)
     return alert
@@ -162,6 +170,22 @@ async def create_case(
             alert = result.scalar_one_or_none()
             if alert:
                 alert.case_id = case.id
+
+    # Audit before commit so it lands in the same transaction.
+    from app.services import audit_service
+    await audit_service.log(
+        db=db,
+        action="case.created",
+        entity_type="case",
+        entity_id=case.id,
+        details={
+            "case_number": case.case_number,
+            "title": case.title,
+            "severity": case.severity,
+            "alert_ids": data.alert_ids,
+        },
+        performed_by=created_by,
+    )
 
     await db.commit()
     await db.refresh(case)
@@ -195,6 +219,17 @@ async def update_case(db: AsyncSession, case_id: UUID, data: CaseUpdate) -> Case
         case.closed_at = now
 
     case.updated_at = now
+
+    if new_status:
+        from app.services import audit_service
+        await audit_service.log(
+            db=db,
+            action=f"case.status.{new_status}",
+            entity_type="case",
+            entity_id=case.id,
+            details={"case_number": case.case_number, "new_status": new_status},
+        )
+
     await db.commit()
     await db.refresh(case)
     return case

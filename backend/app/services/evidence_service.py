@@ -55,11 +55,38 @@ async def create(
         uploaded_by=uploaded_by,
     )
     db.add(row)
+    await db.flush()
+    from app.services import audit_service
+    await audit_service.log(
+        db=db,
+        action="evidence.uploaded",
+        entity_type="case",
+        entity_id=case_id,
+        details={
+            "evidence_id": str(row.id),
+            "filename": filename,
+            "kind": kind,
+            "size_bytes": size_bytes,
+            "sha256": sha256,
+        },
+        performed_by=uploaded_by,
+    )
     await db.commit()
     await db.refresh(row)
     return row
 
 
 async def delete(db: AsyncSession, row: Evidence) -> None:
+    case_id = row.case_id
+    evidence_id = row.id
+    filename = row.filename
     await db.delete(row)
+    from app.services import audit_service
+    await audit_service.log(
+        db=db,
+        action="evidence.deleted",
+        entity_type="case",
+        entity_id=case_id,
+        details={"evidence_id": str(evidence_id), "filename": filename},
+    )
     await db.commit()

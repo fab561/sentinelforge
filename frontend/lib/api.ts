@@ -1,6 +1,7 @@
 import type {
   AlertListResponse,
   Alert,
+  AuditLogListResponse,
   CaseListResponse,
   Case,
   EvidenceListResponse,
@@ -115,5 +116,17 @@ export const api = {
   wazuh: {
     agents: () =>
       get<{ agents: WazuhAgent[]; total: number }>("/api/wazuh/agents"),
+  },
+  audit: {
+    list: (params?: {
+      limit?: number;
+      action?: string;
+      entity_type?: string;
+      entity_id?: string;
+    }) =>
+      get<AuditLogListResponse>(
+        "/api/audit",
+        params as Record<string, string | number>,
+      ),
   },
 };
