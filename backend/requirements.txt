@@ -40,3 +40,8 @@ fpdf2==2.*
 # in-process backend by default; swap to a Redis backend later if we
 # scale beyond one backend replica.
 slowapi==0.1.*
+
+# Test deps. Kept in the main file so the backend image can run them
+# without a second build target — overhead is small (~3MB).
+pytest==8.*
+pytest-asyncio==0.24.*
