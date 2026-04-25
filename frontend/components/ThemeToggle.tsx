@@ -14,15 +14,22 @@ function applyTheme(theme: Theme) {
   root.dataset.theme = effective;
 }
 
+// Lazy initialiser — runs once on mount, in the browser only. Avoids the
+// React-19 set-state-in-effect lint rule that fires on the obvious
+// useEffect+setState pattern. SSR returns the same default ("dark") that
+// the inline boot script in layout.tsx applies, so hydration matches.
+function readStoredTheme(): Theme {
+  if (typeof window === "undefined") return "dark";
+  return (localStorage.getItem(KEY) as Theme | null) ?? "dark";
+}
+
 export function ThemeToggle() {
-  const [theme, setTheme] = useState<Theme>("dark");
+  const [theme, setTheme] = useState<Theme>(readStoredTheme);
 
   useEffect(() => {
-    // Sync state with what the inline boot script already applied.
-    const stored = (localStorage.getItem(KEY) as Theme | null) ?? "dark";
-    setTheme(stored);
-
-    // If the user's choice is "system", follow OS changes live.
+    // If the user's choice is "system", follow OS changes live. This effect
+    // only subscribes — onChange mutates the DOM via applyTheme, not React
+    // state, so it's free of the set-state-in-effect rule.
     const mql = window.matchMedia("(prefers-color-scheme: dark)");
     const onChange = () => {
       if ((localStorage.getItem(KEY) as Theme | null) === "system") applyTheme("system");
