@@ -101,6 +101,26 @@ class CreateCaseAction(BaseAction):
                 "Case created: %s (alert=%s playbook=%s)",
                 case.case_number, alert_id, playbook_name,
             )
+
+            # Best-effort: if the alert source looks honeypot-flavoured and a
+            # source IP is present, harvest matching cowrie events + tty
+            # replays and attach them as case evidence. Failure here MUST NOT
+            # break case creation — analyst still wants the case.
+            cowrie_summary: dict | None = None
+            src_ip = (alert_data.get("observables") or {}).get("source_ip")
+            looks_honeypot = (
+                "cowrie" in (alert_data.get("source") or "").lower()
+                or (alert_data.get("category") or "") in {"brute_force", "honeypot", "intrusion"}
+            )
+            if src_ip and looks_honeypot:
+                try:
+                    from app.playbook.actions.cowrie_evidence import attach_cowrie_evidence
+                    cowrie_summary = await attach_cowrie_evidence(case.id, alert_id, src_ip)
+                except Exception as exc:
+                    logger.warning(
+                        "[%s] cowrie evidence harvest failed: %s", alert_id, exc,
+                    )
+
             return ActionResult(
                 action_type=self.action_type,
                 status="completed",
@@ -109,6 +129,7 @@ class CreateCaseAction(BaseAction):
                     "case_number": case.case_number,
                     "title": case.title,
                     "correlated": False,
+                    **({"cowrie_evidence": cowrie_summary} if cowrie_summary else {}),
                 },
             )
         except Exception as exc:
