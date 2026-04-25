@@ -1,0 +1,112 @@
+name: ci
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+# Older runs on the same branch are cancelled — saves CI minutes when
+# people push fast.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: backend (python)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install deps
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Compile (catch syntax errors fast)
+        working-directory: backend
+        run: python -m compileall -q app seed.py seed_rules.py
+
+      - name: Pytest
+        working-directory: backend
+        env:
+          # Tests don't connect to anything; satisfies pydantic-settings.
+          DATABASE_URL: postgresql+asyncpg://test:test@localhost:5432/test
+          REDIS_URL: redis://localhost:6379/0
+        run: pytest tests/ -v
+
+  frontend:
+    name: frontend (next.js)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install
+        working-directory: frontend
+        run: npm ci
+
+      - name: Typecheck
+        working-directory: frontend
+        run: npx tsc --noEmit
+
+      - name: Lint
+        working-directory: frontend
+        run: npx eslint . --ext .ts,.tsx,.js,.jsx --max-warnings 999
+
+      - name: Build
+        working-directory: frontend
+        env:
+          # next build wants something here even though the bundle never
+          # actually fetches at build time (all pages are force-dynamic).
+          NEXT_PUBLIC_API_URL: http://localhost:8000
+        run: npx next build
+
+  compose:
+    name: docker-compose validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate compose config
+        run: docker compose -f docker-compose.yml config --quiet
+
+      - name: Validate playbook YAML
+        run: |
+          python -m pip install pyyaml
+          python - <<'PY'
+          import glob, sys, yaml
+          errs = 0
+          for f in glob.glob("playbooks/*.yaml"):
+              try:
+                  with open(f) as fh:
+                      yaml.safe_load(fh)
+              except Exception as e:
+                  print(f"INVALID {f}: {e}")
+                  errs += 1
+          sys.exit(errs)
+          PY
+
+      - name: Validate Wazuh rules XML
+        run: |
+          python - <<'PY'
+          import sys, xml.etree.ElementTree as ET
+          path = "wazuh/custom_rules/sentinelforge_rules.xml"
+          with open(path) as f:
+              data = f.read()
+          # File has <group> at the top level — wrap to make a single root.
+          ET.fromstring("<root>" + data + "</root>")
+          print("Wazuh rules XML OK")
+          PY
