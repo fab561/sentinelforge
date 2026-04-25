@@ -11,17 +11,19 @@ import {
   Crosshair,
   ScrollText,
   ShieldAlert,
+  Workflow,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const nav = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/alerts",    label: "Alerts",    icon: AlertTriangle },
-  { href: "/cases",     label: "Cases",     icon: FolderOpen },
-  { href: "/rules",     label: "Rules",     icon: Shield },
-  { href: "/mitre",     label: "MITRE",     icon: Crosshair },
-  { href: "/agents",    label: "Agents",    icon: Cpu },
-  { href: "/audit",     label: "Audit Log", icon: ScrollText },
+  { href: "/dashboard",  label: "Dashboard", icon: LayoutDashboard },
+  { href: "/alerts",     label: "Alerts",    icon: AlertTriangle },
+  { href: "/cases",      label: "Cases",     icon: FolderOpen },
+  { href: "/rules",      label: "Rules",     icon: Shield },
+  { href: "/playbooks",  label: "Playbooks", icon: Workflow },
+  { href: "/mitre",      label: "MITRE",     icon: Crosshair },
+  { href: "/agents",     label: "Agents",    icon: Cpu },
+  { href: "/audit",      label: "Audit Log", icon: ScrollText },
 ];
 
 export function Sidebar() {

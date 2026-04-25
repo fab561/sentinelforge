@@ -7,6 +7,8 @@ import type {
   EvidenceListResponse,
   MitreStatsResponse,
   MttrStatsResponse,
+  PlaybookDryRunResponse,
+  PlaybookSummary,
   RuleListResponse,
   Rule,
   StatsResponse,
@@ -116,6 +118,15 @@ export const api = {
   wazuh: {
     agents: () =>
       get<{ agents: WazuhAgent[]; total: number }>("/api/wazuh/agents"),
+  },
+  playbooks: {
+    list: () => get<PlaybookSummary[]>("/api/playbooks"),
+    reload: () =>
+      fetch(`${BASE}/api/playbooks/reload`, { method: "POST" }).then((r) => {
+        if (!r.ok) throw new Error(`reload failed (${r.status})`);
+      }),
+    dryRun: (alert: Record<string, unknown>) =>
+      post<PlaybookDryRunResponse>("/api/playbooks/dry-run", { alert }),
   },
   audit: {
     list: (params?: {

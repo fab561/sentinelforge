@@ -122,6 +122,30 @@ class PlaybookEngine:
             self._load_playbooks()
         return self._playbooks
 
+    def dry_run(self, alert_data: dict) -> dict[str, Any]:
+        """Evaluate playbooks against an alert WITHOUT executing actions.
+
+        Returns the same shape as run() minus side effects, so the UI can
+        preview which playbooks would fire and which actions they'd take
+        before flipping a rule on in production.
+        """
+        matched = [pb for pb in self.playbooks if pb.matches(alert_data)]
+        return {
+            "matched_playbooks": [pb.name for pb in matched],
+            "planned_actions": [
+                {
+                    "playbook": pb.name,
+                    "action_type": a.get("type"),
+                    "target": a.get("target"),
+                    "params": a.get("params") or {},
+                }
+                for pb in matched
+                for a in pb.actions
+            ],
+            "all_playbooks_evaluated": [pb.name for pb in self.playbooks],
+            "skipped_disabled": [pb.name for pb in self._playbooks if not pb.enabled],
+        }
+
     async def run(self, alert_data: dict) -> dict[str, Any]:
         """Match and execute all applicable playbooks for an alert.
 

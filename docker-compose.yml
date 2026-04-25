@@ -144,6 +144,7 @@ services:
       MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-sf_admin}
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-changeme-minio-pw}
       MINIO_BUCKET: ${MINIO_BUCKET:-sentinelforge-evidence}
+      PLAYBOOK_DIR: /app/playbooks
     depends_on:
       - postgres
       - redis
@@ -152,6 +153,9 @@ services:
       - minio
     volumes:
       - ./backend:/app
+      # Playbook dry-run + listing endpoints need read access to the same
+      # YAML files the playbook-worker executes from.
+      - ./playbooks:/app/playbooks:ro
     networks:
       - sentinelforge
 

@@ -122,6 +122,29 @@ export interface MttrTrendPoint {
   resolved_count: number;
 }
 
+export interface PlaybookSummary {
+  name: string;
+  description: string;
+  enabled: boolean;
+  priority: number;
+  match: string;
+  conditions: Array<Record<string, unknown>>;
+  action_types: string[];
+  source_file: string;
+}
+
+export interface PlaybookDryRunResponse {
+  matched_playbooks: string[];
+  planned_actions: Array<{
+    playbook: string;
+    action_type: string;
+    target: string | null;
+    params: Record<string, unknown>;
+  }>;
+  all_playbooks_evaluated: string[];
+  skipped_disabled: string[];
+}
+
 export interface AuditLogEntry {
   id: string;
   action: string;
