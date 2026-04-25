@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.schemas.alert import AlertResponse
 from app.schemas.case import CaseCreate, CaseListResponse, CaseResponse, CaseUpdate
 from app.services import case_service
 
@@ -49,3 +50,11 @@ async def update_case(
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
     return case
+
+
+@router.get("/{case_id}/alerts", response_model=list[AlertResponse])
+async def list_case_alerts(case_id: UUID, db: AsyncSession = Depends(get_db)):
+    """All alerts correlated/attached to a case."""
+    if not await case_service.get_case(db, case_id):
+        raise HTTPException(status_code=404, detail="Case not found")
+    return await case_service.list_alerts_in_case(db, case_id)

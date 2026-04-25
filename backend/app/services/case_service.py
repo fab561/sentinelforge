@@ -1,5 +1,5 @@
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 from sqlalchemy import func, select, text
@@ -67,6 +67,74 @@ async def list_cases(
 async def get_case(db: AsyncSession, case_id: UUID) -> Case | None:
     result = await db.execute(select(Case).where(Case.id == case_id))
     return result.scalar_one_or_none()
+
+
+async def list_alerts_in_case(db: AsyncSession, case_id: UUID) -> list[Alert]:
+    """Return alerts attached to a case, newest first."""
+    rows = (
+        await db.execute(
+            select(Alert)
+            .where(Alert.case_id == case_id)
+            .order_by(Alert.timestamp.desc())
+        )
+    ).scalars().all()
+    return list(rows)
+
+
+async def find_correlated_open_case(
+    db: AsyncSession,
+    alert: dict,
+    *,
+    window_hours: int = 24,
+) -> Case | None:
+    """Find an existing open case that this alert most likely belongs to.
+
+    Correlation key: same source_ip observable, case still open or
+    investigating, created within the last `window_hours`. This is the
+    cheap-and-effective heuristic real SOCs use first — it collapses
+    50 brute-force attempts from one IP into one case instead of 50.
+
+    Returns the most recent matching case, or None if no correlation.
+    """
+    src_ip = (alert.get("observables") or {}).get("source_ip")
+    if not src_ip:
+        return None
+
+    since = datetime.now(timezone.utc) - timedelta(hours=window_hours)
+    # Cases linked to any alert with the same source_ip in the window.
+    # Going through Alert keeps this resilient to whatever the original
+    # case's title/description happened to mention.
+    row = (
+        await db.execute(
+            select(Case)
+            .join(Alert, Alert.case_id == Case.id)
+            .where(
+                Case.status.in_(["open", "investigating"]),
+                Case.created_at >= since,
+                Alert.observables["source_ip"].astext == src_ip,
+            )
+            .order_by(Case.created_at.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    return row
+
+
+async def attach_alert_to_case(
+    db: AsyncSession,
+    case_id: UUID,
+    alert_id: str,
+) -> Alert | None:
+    """Link an existing alert to a case by alert_id (string)."""
+    alert = (
+        await db.execute(select(Alert).where(Alert.alert_id == alert_id))
+    ).scalar_one_or_none()
+    if alert is None:
+        return None
+    alert.case_id = case_id
+    await db.commit()
+    await db.refresh(alert)
+    return alert
 
 
 async def create_case(

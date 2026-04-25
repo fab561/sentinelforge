@@ -66,6 +66,7 @@ export const api = {
     update: (id: string, body: Partial<Case>) => patch<Case>(`/api/cases/${id}`, body),
     evidence: (id: string) =>
       get<EvidenceListResponse>(`/api/cases/${id}/evidence`),
+    alerts: (id: string) => get<Alert[]>(`/api/cases/${id}/alerts`),
   },
   evidence: {
     // Stream-through; backend proxies MinIO so the browser never needs to

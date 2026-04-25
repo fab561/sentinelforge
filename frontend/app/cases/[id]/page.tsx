@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EvidencePanel } from "@/components/EvidencePanel";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, Layers } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +15,10 @@ export default async function CaseDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const c = await api.cases.get(id).catch(() => null);
+  const [c, alerts] = await Promise.all([
+    api.cases.get(id).catch(() => null),
+    api.cases.alerts(id).catch(() => [] as Awaited<ReturnType<typeof api.cases.alerts>>),
+  ]);
   if (!c) notFound();
 
   return (
@@ -49,6 +52,40 @@ export default async function CaseDetailPage({
           <KV label="Created" value={new Date(c.created_at).toLocaleString()} />
           <KV label="Updated" value={new Date(c.updated_at).toLocaleString()} />
           {c.assigned_to && <KV label="Assigned To" value={c.assigned_to} />}
+        </CardContent>
+      </Card>
+
+      <Card className="bg-card border-border">
+        <CardHeader className="pb-2 flex flex-row items-center justify-between">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Layers className="h-4 w-4 text-primary" />
+            Correlated Alerts ({alerts.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-1.5 pt-0">
+          {alerts.length === 0 ? (
+            <p className="text-xs text-muted-foreground py-2">
+              No alerts attached to this case yet.
+            </p>
+          ) : (
+            alerts.map((a) => (
+              <Link
+                key={a.id}
+                href={`/alerts/${a.alert_id}`}
+                className="flex items-center gap-2 rounded-md border border-border px-2.5 py-2 text-xs hover:bg-accent"
+              >
+                <span className="font-mono text-[11px] text-muted-foreground w-32 shrink-0">
+                  {new Date(a.timestamp).toLocaleString()}
+                </span>
+                <span className="font-medium truncate flex-1">{a.title}</span>
+                <SeverityBadge severity={a.severity} />
+                {a.verdict && <StatusBadge status={a.verdict} />}
+                <span className="text-[11px] font-mono text-muted-foreground">
+                  {a.threat_score ?? "—"}
+                </span>
+              </Link>
+            ))
+          )}
         </CardContent>
       </Card>
 

@@ -68,6 +68,27 @@ class CreateCaseAction(BaseAction):
 
         try:
             async with async_session() as db:
+                # Try to correlate first — if there's already an open case
+                # for this attacker (same source_ip in the last 24h), attach
+                # this alert to it instead of opening a duplicate.
+                existing = await case_service.find_correlated_open_case(db, alert_data)
+                if existing is not None and alert_id:
+                    await case_service.attach_alert_to_case(db, existing.id, alert_id)
+                    logger.info(
+                        "Alert correlated to existing case: %s (alert=%s playbook=%s)",
+                        existing.case_number, alert_id, playbook_name,
+                    )
+                    return ActionResult(
+                        action_type=self.action_type,
+                        status="completed",
+                        result={
+                            "case_id": str(existing.id),
+                            "case_number": existing.case_number,
+                            "title": existing.title,
+                            "correlated": True,
+                        },
+                    )
+
                 case_data = CaseCreate(
                     title=title[:500],
                     description=description,
@@ -87,6 +108,7 @@ class CreateCaseAction(BaseAction):
                     "case_id": str(case.id),
                     "case_number": case.case_number,
                     "title": case.title,
+                    "correlated": False,
                 },
             )
         except Exception as exc:
