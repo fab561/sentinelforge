@@ -72,6 +72,10 @@ export const api = {
     evidence: (id: string) =>
       get<EvidenceListResponse>(`/api/cases/${id}/evidence`),
     alerts: (id: string) => get<Alert[]>(`/api/cases/${id}/alerts`),
+    exportPdfUrl: (id: string) => {
+      const base = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/$/, "");
+      return `${base}/api/cases/${id}/export.pdf`;
+    },
   },
   evidence: {
     // Stream-through; backend proxies MinIO so the browser never needs to

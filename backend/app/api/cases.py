@@ -4,9 +4,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from fastapi.responses import Response
+
 from app.schemas.alert import AlertResponse
 from app.schemas.case import CaseCreate, CaseListResponse, CaseResponse, CaseUpdate
-from app.services import case_service
+from app.services import audit_service, case_service, evidence_service, pdf_service
 
 router = APIRouter(prefix="/cases", tags=["Cases"])
 
@@ -58,3 +60,46 @@ async def list_case_alerts(case_id: UUID, db: AsyncSession = Depends(get_db)):
     if not await case_service.get_case(db, case_id):
         raise HTTPException(status_code=404, detail="Case not found")
     return await case_service.list_alerts_in_case(db, case_id)
+
+
+@router.get("/{case_id}/export.pdf")
+async def export_case_pdf(case_id: UUID, db: AsyncSession = Depends(get_db)):
+    """Render a case as a portable PDF report (header + alerts + evidence
+    + audit). Suitable for attaching to a ticket or emailing to IR."""
+    case = await case_service.get_case(db, case_id)
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    alerts = await case_service.list_alerts_in_case(db, case_id)
+    evidence = (await evidence_service.list_for_case(db, case_id)).items
+    audit = (
+        await audit_service.list_recent(db, limit=50, entity_id=str(case_id))
+    ).items
+
+    case_dict = {
+        "case_number": case.case_number,
+        "title": case.title,
+        "description": case.description,
+        "severity": case.severity,
+        "status": case.status,
+        "created_at": case.created_at,
+        "acknowledged_at": case.acknowledged_at,
+        "resolved_at": case.resolved_at,
+        "closed_at": case.closed_at,
+    }
+    pdf_bytes = await pdf_service.render_case_pdf(
+        case_dict,
+        [a.__dict__ for a in alerts],
+        [e.model_dump() for e in evidence],
+        [r.model_dump() for r in audit],
+    )
+
+    filename = f"{case.case_number}.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Content-Length": str(len(pdf_bytes)),
+        },
+    )

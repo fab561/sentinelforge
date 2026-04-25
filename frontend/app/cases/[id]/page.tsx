@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EvidencePanel } from "@/components/EvidencePanel";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ChevronLeft, Layers } from "lucide-react";
+import { ChevronLeft, Download, Layers } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -23,12 +23,21 @@ export default async function CaseDetailPage({
 
   return (
     <div className="p-6 space-y-4 max-w-3xl">
-      <Link
-        href="/cases"
-        className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-      >
-        <ChevronLeft className="h-3 w-3" /> Back to Cases
-      </Link>
+      <div className="flex items-center justify-between gap-2">
+        <Link
+          href="/cases"
+          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+        >
+          <ChevronLeft className="h-3 w-3" /> Back to Cases
+        </Link>
+        <a
+          href={api.cases.exportPdfUrl(id)}
+          className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs hover:bg-accent"
+        >
+          <Download className="h-3.5 w-3.5" />
+          Export PDF
+        </a>
+      </div>
 
       <div className="space-y-1">
         <div className="flex items-start gap-3 flex-wrap">
