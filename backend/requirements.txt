@@ -35,3 +35,8 @@ minio==7.*
 # Case PDF export — fpdf2 is lighter than reportlab and ships pure-Python
 # wheels, so the backend image stays small. No system-level deps.
 fpdf2==2.*
+
+# Rate limiting — slowapi wraps limits-lib for ASGI/FastAPI. Uses an
+# in-process backend by default; swap to a Redis backend later if we
+# scale beyond one backend replica.
+slowapi==0.1.*

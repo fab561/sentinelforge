@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.router import api_router
 from app.core.config import settings
+from app.core.rate_limit import install as install_rate_limit
 from app.core.redis import close_redis
 
 logger = logging.getLogger("sentinelforge")
@@ -56,6 +57,12 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+
+# Rate limiter — must be installed before routes are added. Per-IP defaults
+# of 120/min cover normal analyst use; the M3 worker hits the API as a
+# trusted internal client and is permitted via the same limit (workers
+# would exceed 120/min only under a misfire we'd want to slow anyway).
+install_rate_limit(app)
 
 # CORS — allow frontend (Module 4) and dev tools
 app.add_middleware(
