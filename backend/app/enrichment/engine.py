@@ -46,6 +46,22 @@ def _is_private_ip(ip: str) -> bool:
     return any(ip.startswith(p) for p in _PRIVATE_PREFIXES)
 
 
+async def _watchlist_lookup(observables: list[tuple[str, str]]) -> list[dict]:
+    """Group observables by type and ask the IOC service for matches."""
+    by_type: dict[str, list[str]] = {"ip": [], "domain": [], "hash": [], "url": []}
+    for obs_type, value in observables:
+        if obs_type in by_type:
+            by_type[obs_type].append(value)
+    from app.services.ioc_service import lookup_matches
+    try:
+        return await lookup_matches(by_type)
+    except Exception as exc:
+        # Watchlist hits are bonus signal — never let a DB hiccup break
+        # the rest of the enrichment pipeline.
+        logger.warning("watchlist lookup failed: %s", exc)
+        return []
+
+
 def _extract_observables(alert_data: dict) -> list[tuple[str, str]]:
     """Return list of (observable_type, value) pairs from alert observables."""
     obs: dict = alert_data.get("observables") or {}
@@ -169,6 +185,31 @@ class EnrichmentEngine:
                 all_results.append(res)
                 if res.error:
                     logger.warning("[%s] %s/%s/%s → error: %s", alert_id, pname, obs_type, value, res.error)
+
+        # IOC watchlist — analyst-curated indicators take precedence over
+        # external feeds. A hit injects a synthetic provider result so the
+        # existing scoring/tag machinery picks it up; severity drives the
+        # score so a "critical" watchlist match alone can fire a playbook.
+        watchlist_hits = await _watchlist_lookup(observables)
+        for hit in watchlist_hits:
+            sev = hit["severity"]
+            score = {"critical": 100, "high": 90, "medium": 70, "low": 40}.get(sev, 60)
+            tag_set = [f"watchlist:{sev}", f"watchlist:src:{hit['source']}"]
+            if hit.get("description"):
+                tag_set.append(f"watchlist:note:{hit['description'][:40]}")
+            all_results.append(ProviderResult(
+                provider="watchlist",
+                observable=hit["value"],
+                observable_type=hit["ioc_type"],
+                score=score,
+                malicious=True,
+                tags=tag_set,
+                raw={"source": hit["source"], "severity": sev},
+            ))
+            logger.info(
+                "[%s] watchlist hit: %s/%s severity=%s",
+                alert_id, hit["ioc_type"], hit["value"], sev,
+            )
 
         # Build per-observable breakdown
         obs_breakdown: dict[str, dict] = {}

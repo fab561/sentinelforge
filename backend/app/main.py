@@ -21,7 +21,7 @@ async def lifespan(app: FastAPI):
     # schema evolution still belongs in alembic; this catches the case
     # where a new model landed and we haven't added a migration yet.
     from app.core.database import engine
-    from app.models import Alert, AuditLog, Case, Evidence, Rule, User  # noqa: F401
+    from app.models import Alert, AuditLog, Case, Evidence, IOC, Rule, User  # noqa: F401
     from app.models.base import Base
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

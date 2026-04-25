@@ -5,6 +5,8 @@ import type {
   CaseListResponse,
   Case,
   EvidenceListResponse,
+  IOC,
+  IOCListResponse,
   MitreStatsResponse,
   MttrStatsResponse,
   PlaybookDryRunResponse,
@@ -118,6 +120,20 @@ export const api = {
   wazuh: {
     agents: () =>
       get<{ agents: WazuhAgent[]; total: number }>("/api/wazuh/agents"),
+  },
+  iocs: {
+    list: (params?: { page?: number; page_size?: number; ioc_type?: string; enabled?: boolean }) =>
+      get<IOCListResponse>("/api/iocs", params as Record<string, string | number>),
+    create: (body: {
+      value: string;
+      ioc_type: string;
+      severity?: string;
+      source?: string;
+      description?: string;
+      enabled?: boolean;
+    }) => post<IOC>("/api/iocs", body),
+    delete: (id: string) => del(`/api/iocs/${id}`),
+    toggle: (id: string, enabled: boolean) => patch<IOC>(`/api/iocs/${id}`, { enabled }),
   },
   playbooks: {
     list: () => get<PlaybookSummary[]>("/api/playbooks"),

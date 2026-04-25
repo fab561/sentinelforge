@@ -122,6 +122,26 @@ export interface MttrTrendPoint {
   resolved_count: number;
 }
 
+export type IOCType = "ip" | "domain" | "hash" | "url";
+
+export interface IOC {
+  id: string;
+  value: string;
+  ioc_type: IOCType;
+  severity: Severity;
+  source: string;
+  description: string | null;
+  enabled: boolean;
+  expires_at: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface IOCListResponse {
+  items: IOC[];
+  total: number;
+}
+
 export interface PlaybookSummary {
   name: string;
   description: string;
