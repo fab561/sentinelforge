@@ -37,7 +37,15 @@ const themeScript = `
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
+    <html
+      lang="en"
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      // The inline themeScript flips classList + data-theme on <html> before
+      // React hydrates so we don't FOUC. That guarantees a server/client mismatch
+      // on those exact attributes — suppressHydrationWarning silences the
+      // expected diff (it only suppresses on the <html> tag itself, not children).
+      suppressHydrationWarning
+    >
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
