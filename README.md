@@ -99,49 +99,213 @@ auto-resolved case with attached evidence" runs in roughly 15 seconds.
 
 ---
 
-## Quick start
+## Installation
 
-Requires Docker Desktop or a Linux Docker engine + Docker Compose v2.
+### Prerequisites
+
+| Tool | Version | Why |
+|---|---|---|
+| Docker Desktop (Windows / macOS) **or** Docker Engine + Compose v2 (Linux) | 24+ | Runs the 11-container stack |
+| Node.js | 20+ | Frontend dev server (M4) |
+| Git | any | Clone |
+| ~6 GB free disk | — | Wazuh + OpenSearch images are large |
+| ~6 GB free RAM | — | OpenSearch alone wants 1 GB JVM heap |
+
+### Step 1 — clone and configure
 
 ```bash
 git clone https://github.com/fab561/sentinelforge.git
 cd sentinelforge
 
-# Copy and edit env (default passwords work out of the box for local lab)
+# Copy the env template. Defaults work for local lab; only the threat-intel
+# API keys must be filled in to see enrichment fire on real IPs.
 cp .env.example .env
-
-# Bring the stack up (10 containers — first boot pulls ~3GB)
-docker compose up -d
-
-# Backend auto-creates tables + seeds 20 alerts / 3 cases / 30 rules
-# on first boot — no extra step needed.
-
-# Optional: re-sync the rules catalog after editing seed.py
-docker exec sf-backend python seed_rules.py
 ```
 
-Then in a separate terminal start the frontend dev server:
+Open `.env` and add your **free** API keys (sign-up links below in
+[API keys](#api-keys-free-tiers)). VirusTotal + AbuseIPDB + OTX are
+the minimum useful set; GreyNoise is optional (50/day free tier is
+stingy).
+
+```ini
+VIRUSTOTAL_API_KEY=...
+ABUSEIPDB_API_KEY=...
+OTX_API_KEY=...
+GREYNOISE_API_KEY=          # optional
+```
+
+### Step 2 — start the backend stack
+
+```bash
+docker compose up -d
+```
+
+First boot pulls roughly 3 GB of images and takes ~5 minutes. The
+backend auto-creates tables and seeds **30 rules + 20 sample alerts +
+3 cases** on first start — no manual seed step.
+
+Watch the stack come up:
+
+```bash
+docker compose ps
+# Expect 11 containers all "Up", including:
+#   sf-wazuh-indexer, sf-wazuh-manager, sf-wazuh-dashboard, sf-wazuh-agent
+#   sf-cowrie, sf-postgres, sf-redis, sf-minio
+#   sf-backend, sf-enrichment-worker, sf-playbook-worker
+```
+
+Wait until the backend health check responds:
+
+```bash
+curl http://localhost:8000/health
+# {"status":"ok","service":"sentinelforge-backend"}
+```
+
+### Step 3 — start the frontend dev server
+
+In a **separate terminal**:
 
 ```bash
 cd frontend
-npm install
-npm run dev
+npm install        # one-time
+npm run dev        # serves on http://localhost:3000
 ```
 
-Endpoints:
+### Step 4 — verify the pipeline works
 
-| Service | URL | Notes |
-|---|---|---|
-| Dashboard | http://localhost:3000 | Next.js — main UI |
-| Backend API | http://localhost:8000 | FastAPI |
-| API docs (Swagger) | http://localhost:8000/docs | auto-generated |
-| Wazuh dashboard | http://localhost:5601 | OpenSearch-based |
-| MinIO console | http://localhost:9101 | evidence storage UI |
-| Cowrie SSH (honeypot) | `ssh -p 2222 root@localhost` | password: anything (some pwds work, most fail — log captures everything) |
+Inject a test alert with a known-bad IP and watch it flow through
+enrichment → playbook → case:
+
+```bash
+docker exec sf-backend python -c "
+import asyncio, json, uuid
+from datetime import datetime, timezone
+from app.core.database import async_session
+from app.core.redis import get_redis, close_redis
+from app.models.alert import Alert
+async def go():
+    aid=f'sanity-{uuid.uuid4().hex[:6]}'
+    async with async_session() as db:
+        db.add(Alert(alert_id=aid, timestamp=datetime.now(timezone.utc),
+            source='manual-test', severity='critical', category='honeypot',
+            title='Sanity check: known-bad IP',
+            observables={'source_ip':'185.220.101.1'},
+            raw_log='', status='new'))
+        await db.commit()
+    r=await get_redis()
+    await r.lpush('alerts:pending_enrichment', json.dumps({
+        'alert_id':aid,'observables':{'source_ip':'185.220.101.1'},
+        'severity':'critical','category':'honeypot','source':'cowrie',
+        'title':'Sanity'}))
+    await close_redis()
+    print('injected:',aid)
+asyncio.run(go())
+"
+```
+
+Open http://localhost:3000/alerts after ~10 s — the alert should be
+enriched with `verdict=suspicious` or `malicious` and tagged from
+VT / AbuseIPDB / OTX. A new case appears at http://localhost:3000/cases.
 
 ---
 
-## Free threat-intel API keys
+## Access URLs
+
+All services bind to `localhost` on the host machine. Make sure no other
+process is using these ports before `docker compose up`.
+
+| # | Service | URL | Port | What it is |
+|---|---|---|---|---|
+| 1 | **SentinelForge dashboard (M4)** | http://localhost:3000 | 3000 | Main analyst UI — start here |
+| 2 | **Backend API** | http://localhost:8000 | 8000 | FastAPI — REST endpoints |
+| 3 | **API docs (Swagger UI)** | http://localhost:8000/docs | 8000 | Auto-generated, try-it-out |
+| 4 | **Backend health** | http://localhost:8000/health | 8000 | `{"status":"ok"}` when ready |
+| 5 | **Wazuh dashboard** | http://localhost:5601 | 5601 | OpenSearch UI for raw alerts |
+| 6 | **Wazuh dashboard — direct app** | http://localhost:5601/app/wz-home | 5601 | Wazuh app entry (4.14 renamed `/app/wazuh` → `/app/wz-home`) |
+| 7 | **Wazuh indexer (OpenSearch)** | http://localhost:9200 | 9200 | REST API for raw indices |
+| 8 | **Wazuh manager API** | https://localhost:55000 | 55000 | Self-signed cert; `-k` to curl |
+| 9 | **MinIO S3 API** | http://localhost:9100 | 9100 | Programmatic access to evidence bucket |
+| 10 | **MinIO console** | http://localhost:9101 | 9101 | Web UI for the evidence bucket |
+| 11 | **Cowrie SSH (honeypot)** | `ssh -p 2222 root@localhost` | 2222 | Connections logged + auto-attached to cases |
+| 12 | **Postgres (direct)** | `psql -h localhost -p 5432 -U sf_admin sentinelforge` | 5432 | Use only for debugging |
+| 13 | **Redis (direct)** | `redis-cli -h localhost -p 6379` | 6379 | Use only for debugging |
+
+### Frontend pages
+
+Once you're at http://localhost:3000, the sidebar links to:
+
+| Path | What it shows |
+|---|---|
+| `/dashboard` | Stat cards (alerts, cases, agents), severity + verdict breakdown, MTTA/MTTR + 14-day SLA trend, recent alerts/cases, top categories |
+| `/alerts` | Paginated alert list with filter chips (severity, status) |
+| `/alerts/[alert_id]` | Alert detail — observables, MITRE, enrichment JSON, playbook actions, raw log |
+| `/cases` | Paginated case list |
+| `/cases/[id]` | Case detail — correlated alerts, evidence panel (upload + download), Export PDF button |
+| `/rules` | All 30 detection rules (Wazuh + Sigma) |
+| `/playbooks` | YAML playbook cards + dry-run panel |
+| `/iocs` | IOC watchlist — add / toggle / delete indicators |
+| `/mitre` | ATT&CK coverage heatmap (14 tactics × techniques observed) |
+| `/agents` | Wazuh agent status |
+| `/audit` | Audit log with filter chips |
+
+---
+
+## Credentials
+
+**Lab use only — change every value below before exposing this stack
+to the internet.** All defaults live in `.env.example` and are read
+from `.env` at boot.
+
+| Service | Username | Password | Set via |
+|---|---|---|---|
+| **SentinelForge admin** (seeded) | `admin@sentinelforge.local` (or `admin`) | `admin123` | `seed.py` (idempotent — won't re-seed) |
+| **Wazuh manager API** | `wazuh-wui` | `MyS3cr3tP4ssw0rd!` | `WAZUH_API_USER` / `WAZUH_API_PASSWORD` |
+| **Wazuh indexer (OpenSearch)** | _security plugin disabled_ | — | `wazuh/indexer/opensearch.yml` |
+| **Wazuh dashboard** | _security plugin stripped at boot_ | — | docker-compose entrypoint |
+| **Postgres** | `sf_admin` | `changeme` | `POSTGRES_USER` / `POSTGRES_PASSWORD` |
+| **MinIO root** | `sf_admin` | `changeme-minio-pw` | `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` |
+| **MinIO access key** (backend → MinIO) | `sf_admin` | `changeme-minio-pw` | `MINIO_ACCESS_KEY` / `MINIO_SECRET_KEY` |
+| **JWT secret** (NextAuth — currently unused, prepared for future auth) | n/a | `changeme-in-production` | `SECRET_KEY` |
+| **Cowrie SSH honeypot** | `root` (or any) | many work, most fail — that's the point | hardcoded in cowrie's default `userdb` |
+
+### Threat-intel API keys (you supply)
+
+Free tiers are sufficient for development; see [API keys](#api-keys-free-tiers).
+
+| Provider | Env var |
+|---|---|
+| VirusTotal | `VIRUSTOTAL_API_KEY` |
+| AbuseIPDB | `ABUSEIPDB_API_KEY` |
+| GreyNoise (Community) | `GREYNOISE_API_KEY` |
+| AlienVault OTX | `OTX_API_KEY` |
+| Cloudflare (optional, for `block_ip` action) | `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ZONE_ID` |
+
+After editing `.env`, **recreate** the affected containers (a plain
+restart doesn't re-substitute env vars):
+
+```bash
+docker compose up -d --force-recreate backend enrichment-worker playbook-worker
+```
+
+### Known quirks
+
+- **Wazuh dashboard auth-token error popup**: the wazuh plugin
+  occasionally surfaces `AxiosError: Error getting the authorization
+  token` on the home screen. The plugin polls the manager API every
+  10 s; if the manager is mid-restart or the API token cache expired,
+  the popup briefly appears. Dismiss it — the underlying alert flow
+  is unaffected. SentinelForge's own UI on http://localhost:3000
+  reads its own DB and is independent.
+- **Cowrie passwords**: the default Cowrie userdb permits a small set
+  (`root/root`, `root/12345`, etc.) and rejects everything else.
+  Connection events are still logged for failed attempts — the
+  evidence harvester captures them either way. Customise via a
+  `userdb.txt` baked into a custom Cowrie image if you need more.
+
+---
+
+<a id="api-keys-free-tiers"></a>
+## API keys (free tiers)
 
 All four providers offer free tiers ample for development:
 
