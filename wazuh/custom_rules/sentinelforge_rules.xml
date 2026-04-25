@@ -167,7 +167,7 @@
   <!-- Recon tool signatures in user-agent or command line -->
   <rule id="100251" level="10">
     <if_group>syslog</if_group>
-    <regex>nmap |masscan |zmap |nikto |dirb |gobuster |wpscan </regex>
+    <regex type="pcre2">nmap |masscan |zmap |nikto |dirb |gobuster |wpscan </regex>
     <description>Recon: Known scanning tool invocation detected</description>
     <mitre>
       <id>T1595</id>
@@ -177,10 +177,10 @@
 
   <!-- ===== INITIAL ACCESS ===== -->
 
-  <!-- Web shell pattern: common PHP/JSP backdoor hash -->
+  <!-- Web shell pattern: common PHP/JSP backdoor extension under web root -->
   <rule id="100252" level="14">
     <if_sid>554</if_sid>
-    <regex>\.(php|phtml|jsp|aspx)$</regex>
+    <regex type="pcre2">\.(php|phtml|jsp|aspx)$</regex>
     <match>/var/www/|/srv/www/|/usr/share/nginx/html/</match>
     <description>Initial Access: Possible web shell uploaded to web root</description>
     <mitre>
@@ -192,7 +192,7 @@
   <!-- Successful SSH login from external (public) IP -->
   <rule id="100253" level="10">
     <if_sid>5715</if_sid>
-    <regex>from (?!10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|127\.)</regex>
+    <regex type="pcre2">from (?!10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|127\.)</regex>
     <description>Initial Access: Successful SSH login from external IP</description>
     <mitre>
       <id>T1078</id>
@@ -227,7 +227,7 @@
   <!-- New user account created -->
   <rule id="100256" level="11">
     <if_group>syslog</if_group>
-    <match>new user:|useradd[</match>
+    <match>new user:|useradd </match>
     <description>Persistence: New user account created</description>
     <mitre>
       <id>T1136.001</id>
@@ -251,7 +251,7 @@
   <!-- Wazuh agent stopped or restarted unexpectedly -->
   <rule id="100260" level="13">
     <if_group>syslog</if_group>
-    <regex>wazuh-agentd.*(stopped|killed|terminated)</regex>
+    <regex type="pcre2">wazuh-agentd.*(stopped|killed|terminated)</regex>
     <description>Defense Evasion: Wazuh agent stopped — possible tampering</description>
     <mitre>
       <id>T1562.001</id>
@@ -262,7 +262,7 @@
   <!-- Log file cleared / truncated -->
   <rule id="100261" level="13">
     <if_group>syslog</if_group>
-    <regex>&gt; /var/log/|: /var/log/\S+ (truncated|cleared)</regex>
+    <regex type="pcre2">&gt; /var/log/|: /var/log/\S+ (truncated|cleared)</regex>
     <description>Defense Evasion: System log file cleared or truncated</description>
     <mitre>
       <id>T1070.002</id>
@@ -273,7 +273,7 @@
   <!-- Firewall rules flushed -->
   <rule id="100262" level="13">
     <if_group>syslog</if_group>
-    <regex>iptables -F|iptables --flush|ufw disable|systemctl stop firewalld</regex>
+    <regex type="pcre2">iptables -F|iptables --flush|ufw disable|systemctl stop firewalld</regex>
     <description>Defense Evasion: Host firewall disabled or rules flushed</description>
     <mitre>
       <id>T1562.004</id>
@@ -284,7 +284,7 @@
   <!-- Bash history cleared -->
   <rule id="100263" level="11">
     <if_group>syslog</if_group>
-    <regex>history -c|&gt; ~/.bash_history|rm .*\.bash_history</regex>
+    <regex type="pcre2">history -c|&gt; ~/.bash_history|rm .*\.bash_history</regex>
     <description>Defense Evasion: Shell history cleared</description>
     <mitre>
       <id>T1070.003</id>
@@ -297,7 +297,7 @@
   <!-- /etc/shadow read -->
   <rule id="100270" level="13">
     <if_group>syslog</if_group>
-    <regex>(cat|less|more|head|tail|grep) .*/etc/shadow</regex>
+    <regex type="pcre2">(cat|less|more|head|tail|grep) .*/etc/shadow</regex>
     <description>Credential Access: /etc/shadow read attempt</description>
     <mitre>
       <id>T1003.008</id>
@@ -310,7 +310,7 @@
   <!-- Reverse shell spawn pattern -->
   <rule id="100280" level="15">
     <if_group>syslog</if_group>
-    <regex>bash -i &gt;&amp;? /dev/tcp/|nc -[el]*e .*/bin/(ba)?sh|python -c 'import socket</regex>
+    <regex type="pcre2">bash -i &gt;&amp;? /dev/tcp/|nc -[el]*e .*/bin/(ba)?sh|python -c 'import socket</regex>
     <description>C2: Reverse shell command pattern detected</description>
     <mitre>
       <id>T1059.004</id>
@@ -321,7 +321,7 @@
   <!-- Base64-encoded command execution (often used to hide payloads) -->
   <rule id="100281" level="12">
     <if_group>syslog</if_group>
-    <regex>(bash|sh) .*-c .*base64 -d|echo [A-Za-z0-9+/]{40,}=* \| base64 -d</regex>
+    <regex type="pcre2">(bash|sh) .*-c .*base64 -d|echo [A-Za-z0-9+/]{40,}=* \| base64 -d</regex>
     <description>C2: Base64-encoded command execution — obfuscation suspected</description>
     <mitre>
       <id>T1027</id>
@@ -334,7 +334,7 @@
   <!-- Cryptominer process signatures -->
   <rule id="100290" level="14">
     <if_group>syslog</if_group>
-    <regex>xmrig|minerd|cpuminer|coinhive|cryptonight|stratum\+tcp</regex>
+    <regex type="pcre2">xmrig|minerd|cpuminer|coinhive|cryptonight|stratum\+tcp</regex>
     <description>Impact: Cryptocurrency miner process detected</description>
     <mitre>
       <id>T1496</id>
@@ -345,7 +345,7 @@
   <!-- Mass file deletion / destructive command -->
   <rule id="100291" level="15">
     <if_group>syslog</if_group>
-    <regex>rm -rf / |dd if=/dev/(zero|random) of=/dev/[sh]d|mkfs\.</regex>
+    <regex type="pcre2">rm -rf / |dd if=/dev/(zero|random) of=/dev/[sh]d|mkfs\.</regex>
     <description>Impact: Destructive command detected (mass delete / disk wipe)</description>
     <mitre>
       <id>T1485</id>
