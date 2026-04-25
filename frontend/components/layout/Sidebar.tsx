@@ -15,6 +15,7 @@ import {
   Workflow,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const nav = [
   { href: "/dashboard",  label: "Dashboard", icon: LayoutDashboard },
@@ -63,8 +64,9 @@ export function Sidebar() {
         })}
       </nav>
 
-      <div className="border-t border-border p-3 text-xs text-muted-foreground">
-        Module 4 — SOC Dashboard
+      <div className="border-t border-border p-3 space-y-2">
+        <ThemeToggle />
+        <div className="text-xs text-muted-foreground">Module 4 — SOC Dashboard</div>
       </div>
     </aside>
   );
