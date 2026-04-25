@@ -289,18 +289,16 @@ docker compose up -d --force-recreate backend enrichment-worker playbook-worker
 
 ### Known quirks
 
-- **Wazuh dashboard auth-token error popup**: the wazuh plugin
-  occasionally surfaces `AxiosError: Error getting the authorization
-  token` on the home screen. The plugin polls the manager API every
-  10 s; if the manager is mid-restart or the API token cache expired,
-  the popup briefly appears. Dismiss it — the underlying alert flow
-  is unaffected. SentinelForge's own UI on http://localhost:3000
-  reads its own DB and is independent.
 - **Cowrie passwords**: the default Cowrie userdb permits a small set
   (`root/root`, `root/12345`, etc.) and rejects everything else.
   Connection events are still logged for failed attempts — the
   evidence harvester captures them either way. Customise via a
   `userdb.txt` baked into a custom Cowrie image if you need more.
+- **Wazuh dashboard transient popups during boot**: on cold start the
+  Wazuh dashboard plugin can race the manager's API while it's still
+  initialising and surface a brief auth-token toast. Wait ~30 s after
+  `docker compose up` and refresh — it clears once the manager is
+  fully ready.
 
 ---
 
